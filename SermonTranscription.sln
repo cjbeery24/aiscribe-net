@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Domain", "SermonTranscription.Domain\SermonTranscription.Domain.csproj", "{CB4758A3-CEDC-4B36-A3C9-2808B46764E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Application", "SermonTranscription.Application\SermonTranscription.Application.csproj", "{A906B036-A42C-459C-8BAE-2D5B9FC104FD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Infrastructure", "SermonTranscription.Infrastructure\SermonTranscription.Infrastructure.csproj", "{231CC8EC-0F5A-4420-8BD3-0B6E5D24F705}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Api", "SermonTranscription.Api\SermonTranscription.Api.csproj", "{F3CC5BA2-B849-4574-9049-43F9CBB573D1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Tests.Unit", "SermonTranscription.Tests.Unit\SermonTranscription.Tests.Unit.csproj", "{6EA771B2-BBAA-4F7B-ACCA-13CBF183A413}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SermonTranscription.Tests.Integration", "SermonTranscription.Tests.Integration\SermonTranscription.Tests.Integration.csproj", "{9F090F69-057B-4062-8D3D-5CDFF2865464}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CB4758A3-CEDC-4B36-A3C9-2808B46764E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB4758A3-CEDC-4B36-A3C9-2808B46764E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB4758A3-CEDC-4B36-A3C9-2808B46764E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB4758A3-CEDC-4B36-A3C9-2808B46764E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A906B036-A42C-459C-8BAE-2D5B9FC104FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A906B036-A42C-459C-8BAE-2D5B9FC104FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A906B036-A42C-459C-8BAE-2D5B9FC104FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A906B036-A42C-459C-8BAE-2D5B9FC104FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{231CC8EC-0F5A-4420-8BD3-0B6E5D24F705}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{231CC8EC-0F5A-4420-8BD3-0B6E5D24F705}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{231CC8EC-0F5A-4420-8BD3-0B6E5D24F705}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{231CC8EC-0F5A-4420-8BD3-0B6E5D24F705}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3CC5BA2-B849-4574-9049-43F9CBB573D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3CC5BA2-B849-4574-9049-43F9CBB573D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3CC5BA2-B849-4574-9049-43F9CBB573D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3CC5BA2-B849-4574-9049-43F9CBB573D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EA771B2-BBAA-4F7B-ACCA-13CBF183A413}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EA771B2-BBAA-4F7B-ACCA-13CBF183A413}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EA771B2-BBAA-4F7B-ACCA-13CBF183A413}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EA771B2-BBAA-4F7B-ACCA-13CBF183A413}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F090F69-057B-4062-8D3D-5CDFF2865464}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F090F69-057B-4062-8D3D-5CDFF2865464}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F090F69-057B-4062-8D3D-5CDFF2865464}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F090F69-057B-4062-8D3D-5CDFF2865464}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
