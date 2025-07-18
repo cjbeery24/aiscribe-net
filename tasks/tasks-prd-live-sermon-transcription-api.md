@@ -32,9 +32,13 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Domain/Entities/TranscriptionSession.cs` - Transcription session entity
 - `SermonTranscription.Domain/Entities/Transcription.cs` - Saved transcription entity
 - `SermonTranscription.Domain/Entities/Subscription.cs` - Subscription plan entity
-- `SermonTranscription.Domain/Interfaces/IUserRepository.cs` - User data access interface
-- `SermonTranscription.Domain/Interfaces/IOrganizationRepository.cs` - Organization data access interface
-- `SermonTranscription.Domain/Interfaces/ITranscriptionRepository.cs` - Transcription data access interface
+- `SermonTranscription.Domain/Interfaces/IBaseRepository.cs` - Generic base repository interface for common CRUD operations
+- `SermonTranscription.Domain/Interfaces/IUserRepository.cs` - User data access interface with authentication methods
+- `SermonTranscription.Domain/Interfaces/IOrganizationRepository.cs` - Organization data access interface with multi-tenant operations
+- `SermonTranscription.Domain/Interfaces/ITranscriptionSessionRepository.cs` - TranscriptionSession data access interface with session management
+- `SermonTranscription.Domain/Interfaces/ITranscriptionRepository.cs` - Transcription data access interface with search and filtering
+- `SermonTranscription.Domain/Interfaces/ITranscriptionSegmentRepository.cs` - TranscriptionSegment data access interface for segment operations
+- `SermonTranscription.Domain/Interfaces/ISubscriptionRepository.cs` - Subscription data access interface with billing and usage tracking
 - `SermonTranscription.Application/Services/AuthService.cs` - Authentication business logic
 - `SermonTranscription.Application/Services/TranscriptionService.cs` - Transcription processing service
 - `SermonTranscription.Application/Services/OrganizationService.cs` - Organization management service
@@ -71,8 +75,8 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 1.1 Create .NET 8 Web API project with Clean Architecture structure
   - [x] 1.2 Set up project dependencies (Entity Framework Core, SignalR, JWT, etc.)
   - [x] 1.3 Configure dependency injection container and service registration
-  - [ ] 1.4 Set up Entity Framework Core with PostgreSQL connection
-  - [ ] 1.5 Create base domain entities and repository interfaces
+  - [x] 1.4 Set up Entity Framework Core with PostgreSQL connection
+  - [x] 1.5 Create base domain entities and repository interfaces
   - [ ] 1.6 Configure logging, CORS, and API versioning
   - [ ] 1.7 Set up unit and integration test projects with xUnit
   - [ ] 1.8 Create Docker configuration for containerization
