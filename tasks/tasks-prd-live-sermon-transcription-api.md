@@ -5,7 +5,13 @@ Based on: `prd-live-sermon-transcription-api.md`
 ## Relevant Files
 
 - `SermonTranscription.sln` - Solution file containing all projects with proper references
+- `.gitignore` - Comprehensive git ignore file for .NET projects
 - `SermonTranscription.Api/Program.cs` - Main application entry point and service configuration
+- `SermonTranscription.Api/SermonTranscription.Api.csproj` - API layer with SignalR, JWT Auth, FluentValidation, API versioning
+- `SermonTranscription.Application/SermonTranscription.Application.csproj` - Application layer with AutoMapper, FluentValidation
+- `SermonTranscription.Infrastructure/SermonTranscription.Infrastructure.csproj` - Infrastructure layer with PostgreSQL EF Core, Redis, HTTP clients
+- `SermonTranscription.Tests.Unit/SermonTranscription.Tests.Unit.csproj` - Unit test project with Moq, FluentAssertions
+- `SermonTranscription.Tests.Integration/SermonTranscription.Tests.Integration.csproj` - Integration test project with ASP.NET Core test host
 - `SermonTranscription.Api/Controllers/AuthController.cs` - Authentication endpoints (login, register, refresh tokens)
 - `SermonTranscription.Api/Controllers/OrganizationsController.cs` - Organization management endpoints
 - `SermonTranscription.Api/Controllers/UsersController.cs` - User management and profile endpoints
@@ -57,9 +63,9 @@ Based on: `prd-live-sermon-transcription-api.md`
 
 - [ ] 1.0 Project Foundation & Infrastructure Setup
   - [x] 1.1 Create .NET 8 Web API project with Clean Architecture structure
-  - [ ] 1.2 Set up project dependencies (Entity Framework Core, SignalR, JWT, etc.)
+  - [x] 1.2 Set up project dependencies (Entity Framework Core, SignalR, JWT, etc.)
   - [ ] 1.3 Configure dependency injection container and service registration
-  - [ ] 1.4 Set up Entity Framework Core with SQL Server connection
+  - [ ] 1.4 Set up Entity Framework Core with PostgreSQL connection
   - [ ] 1.5 Create base domain entities and repository interfaces
   - [ ] 1.6 Configure logging, CORS, and API versioning
   - [ ] 1.7 Set up unit and integration test projects with xUnit
