@@ -12,12 +12,12 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Infrastructure/SermonTranscription.Infrastructure.csproj` - Infrastructure layer with PostgreSQL EF Core, Redis, HTTP clients
 - `SermonTranscription.Tests.Unit/SermonTranscription.Tests.Unit.csproj` - Unit test project with Moq, FluentAssertions
 - `SermonTranscription.Tests.Integration/SermonTranscription.Tests.Integration.csproj` - Integration test project with ASP.NET Core test host
-- `SermonTranscription.Api/Program.cs` - Complete DI configuration with JWT auth, SignalR, CORS, API versioning
+- `SermonTranscription.Api/Program.cs` - Complete DI configuration with JWT auth, SignalR, CORS, API versioning, and Serilog
 - `SermonTranscription.Application/DependencyInjection.cs` - Application layer service registration
 - `SermonTranscription.Infrastructure/DependencyInjection.cs` - Infrastructure layer service registration with EF Core and Redis
 - `SermonTranscription.Infrastructure/Data/AppDbContext.cs` - Entity Framework database context placeholder
-- `SermonTranscription.Api/appsettings.json` - Production configuration with JWT, connection strings, external services
-- `SermonTranscription.Api/appsettings.Development.json` - Development-specific configuration
+- `SermonTranscription.Api/appsettings.json` - Production configuration with JWT, Serilog, external services
+- `SermonTranscription.Api/appsettings.Local.json` - Development-specific configuration with enhanced Serilog settings
 - `SermonTranscription.Api/Controllers/AuthController.cs` - Authentication endpoints (login, register, refresh tokens)
 - `SermonTranscription.Api/Controllers/OrganizationsController.cs` - Organization management endpoints
 - `SermonTranscription.Api/Controllers/UsersController.cs` - User management and profile endpoints
@@ -39,6 +39,7 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Domain/Interfaces/ITranscriptionRepository.cs` - Transcription data access interface with search and filtering
 - `SermonTranscription.Domain/Interfaces/ITranscriptionSegmentRepository.cs` - TranscriptionSegment data access interface for segment operations
 - `SermonTranscription.Domain/Interfaces/ISubscriptionRepository.cs` - Subscription data access interface with billing and usage tracking
+- `SermonTranscription.Api/Middleware/RequestResponseLoggingMiddleware.cs` - Request/response logging middleware with correlation tracking
 - `SermonTranscription.Application/Services/AuthService.cs` - Authentication business logic
 - `SermonTranscription.Application/Services/TranscriptionService.cs` - Transcription processing service
 - `SermonTranscription.Application/Services/OrganizationService.cs` - Organization management service
@@ -77,7 +78,7 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 1.3 Configure dependency injection container and service registration
   - [x] 1.4 Set up Entity Framework Core with PostgreSQL connection
   - [x] 1.5 Create base domain entities and repository interfaces
-  - [ ] 1.6 Configure logging, CORS, and API versioning
+  - [x] 1.6 Configure logging, CORS, and API versioning
   - [ ] 1.7 Set up unit and integration test projects with xUnit
   - [ ] 1.8 Create Docker configuration for containerization
 - [ ] 2.0 Authentication & Multi-Tenant Architecture

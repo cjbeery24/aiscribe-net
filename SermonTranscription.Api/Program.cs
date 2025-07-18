@@ -3,11 +3,40 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.IdentityModel.Tokens;
+using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application;
 using SermonTranscription.Infrastructure;
+using Serilog;
+using Serilog.Events;
 using System.Text;
 
+// Create initial configuration to read Serilog settings
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+// Ensure logs directory exists
+Directory.CreateDirectory("logs");
+
+// Configure Serilog from configuration
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(configuration)
+    .CreateLogger();
+
+try
+{
+    Log.Information("Starting Sermon Transcription API");
+    
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Serilog as the logging provider and configure it to read from config
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext());
 
 // Add services to the container
 
@@ -143,6 +172,9 @@ if (app.Environment.IsDevelopment())
 // Security Headers
 app.UseHttpsRedirection();
 
+// Request/Response Logging (before authentication to capture all requests)
+app.UseMiddleware<RequestResponseLoggingMiddleware>();
+
 // CORS
 app.UseCors("AllowFrontend");
 
@@ -160,3 +192,14 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.Information("Shutting down Sermon Transcription API");
+    Log.CloseAndFlush();
+}
