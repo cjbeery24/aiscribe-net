@@ -1,5 +1,6 @@
 using Bogus;
 using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
 
 namespace SermonTranscription.Tests.Unit.Common;
 
@@ -26,7 +27,7 @@ public static class TestDataFactory
         .RuleFor(o => o.UpdatedAt, (f, o) => f.Date.Between(o.CreatedAt, DateTime.UtcNow))
         .RuleFor(o => o.IsActive, f => f.Random.Bool(0.9f))
         .RuleFor(o => o.MaxUsers, f => f.Random.Int(5, 100))
-        .RuleFor(o => o.MaxTranscriptionHours, f => f.Random.Decimal(10, 1000))
+        .RuleFor(o => o.MaxTranscriptionHours, f => f.Random.Int(10, 1000))
         .RuleFor(o => o.CanExportTranscriptions, f => f.Random.Bool(0.8f))
         .RuleFor(o => o.HasRealtimeTranscription, f => f.Random.Bool(0.7f));
 
@@ -135,12 +136,12 @@ public static class TestDataFactory
         _ => 1
     };
 
-    private static decimal GetMaxHoursForPlan(SubscriptionPlan plan) => plan switch
+    private static int GetMaxHoursForPlan(SubscriptionPlan plan) => plan switch
     {
-        SubscriptionPlan.Basic => 10m,
-        SubscriptionPlan.Professional => 50m,
-        SubscriptionPlan.Enterprise => 200m,
-        _ => 1m
+        SubscriptionPlan.Basic => 10,
+        SubscriptionPlan.Professional => 50,
+        SubscriptionPlan.Enterprise => 200,
+        _ => 1
     };
 
     /// <summary>

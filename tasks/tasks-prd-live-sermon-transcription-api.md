@@ -27,8 +27,12 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Api/Hubs/TranscriptionHub.cs` - SignalR hub for real-time updates
 - `SermonTranscription.Api/Middleware/AuthenticationMiddleware.cs` - JWT token validation middleware
 - `SermonTranscription.Api/Middleware/TenantMiddleware.cs` - Multi-tenant context resolution
-- `SermonTranscription.Domain/Entities/User.cs` - User domain entity
-- `SermonTranscription.Domain/Entities/Organization.cs` - Organization domain entity
+- `SermonTranscription.Domain/Entities/User.cs` - Enhanced User domain entity with role-based permissions and validation
+- `SermonTranscription.Domain/Entities/Organization.cs` - Enhanced Organization domain entity with business rules and validation
+- `SermonTranscription.Domain/Enums/UserRole.cs` - User role enumeration for role-based access control
+- `SermonTranscription.Domain/Exceptions/DomainException.cs` - Base domain exception for business rule violations
+- `SermonTranscription.Domain/Exceptions/UserDomainException.cs` - User-specific domain exceptions
+- `SermonTranscription.Domain/Exceptions/OrganizationDomainException.cs` - Organization-specific domain exceptions
 - `SermonTranscription.Domain/Entities/TranscriptionSession.cs` - Transcription session entity
 - `SermonTranscription.Domain/Entities/Transcription.cs` - Saved transcription entity
 - `SermonTranscription.Domain/Entities/Subscription.cs` - Subscription plan entity
@@ -44,6 +48,8 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Tests.Unit/Common/TestDataFactory.cs` - Bogus-based factory for generating realistic test data
 - `SermonTranscription.Tests.Integration/Common/BaseIntegrationTest.cs` - Base class for integration tests with ASP.NET Core test server
 - `SermonTranscription.Tests.Unit/Entities/UserTests.cs` - Sample unit tests for User entity domain methods
+- `SermonTranscription.Tests.Unit/Entities/UserEnhancedTests.cs` - Comprehensive tests for User role-based permissions and validation
+- `SermonTranscription.Tests.Unit/Entities/OrganizationEnhancedTests.cs` - Comprehensive tests for Organization business rules and validation
 - `SermonTranscription.Tests.Integration/Controllers/HealthCheckTests.cs` - Sample integration tests for health check endpoint
 - `Dockerfile` - Multi-stage production-ready containerization with security best practices
 - `docker-compose.yml` - Development environment with PostgreSQL, Redis, and API services
@@ -95,7 +101,7 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 1.7 Set up unit and integration test projects with xUnit
   - [x] 1.8 Create Docker configuration for containerization
 - [ ] 2.0 Authentication & Multi-Tenant Architecture
-  - [ ] 2.1 Implement User and Organization domain entities with relationships
+  - [x] 2.1 Implement User and Organization domain entities with relationships
   - [ ] 2.2 Create JWT authentication service with token generation and validation
   - [ ] 2.3 Set up role-based authorization with Organization Admin/User roles
   - [ ] 2.4 Implement multi-tenant middleware for organization data isolation

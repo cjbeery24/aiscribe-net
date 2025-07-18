@@ -1,4 +1,5 @@
 using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
 
 namespace SermonTranscription.Domain.Interfaces;
 

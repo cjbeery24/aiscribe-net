@@ -1,23 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using SermonTranscription.Domain.Enums;
 
 namespace SermonTranscription.Domain.Entities;
-
-public enum SubscriptionPlan
-{
-    Free,
-    Basic,
-    Professional,
-    Enterprise
-}
-
-public enum SubscriptionStatus
-{
-    Active,
-    PastDue,
-    Cancelled,
-    Suspended,
-    Expired
-}
 
 public class Subscription
 {
