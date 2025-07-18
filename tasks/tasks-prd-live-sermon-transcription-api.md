@@ -40,6 +40,11 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Domain/Interfaces/ITranscriptionSegmentRepository.cs` - TranscriptionSegment data access interface for segment operations
 - `SermonTranscription.Domain/Interfaces/ISubscriptionRepository.cs` - Subscription data access interface with billing and usage tracking
 - `SermonTranscription.Api/Middleware/RequestResponseLoggingMiddleware.cs` - Request/response logging middleware with correlation tracking
+- `SermonTranscription.Tests.Unit/Common/BaseUnitTest.cs` - Base class for unit tests with DI and in-memory database
+- `SermonTranscription.Tests.Unit/Common/TestDataFactory.cs` - Bogus-based factory for generating realistic test data
+- `SermonTranscription.Tests.Integration/Common/BaseIntegrationTest.cs` - Base class for integration tests with ASP.NET Core test server
+- `SermonTranscription.Tests.Unit/Entities/UserTests.cs` - Sample unit tests for User entity domain methods
+- `SermonTranscription.Tests.Integration/Controllers/HealthCheckTests.cs` - Sample integration tests for health check endpoint
 - `SermonTranscription.Application/Services/AuthService.cs` - Authentication business logic
 - `SermonTranscription.Application/Services/TranscriptionService.cs` - Transcription processing service
 - `SermonTranscription.Application/Services/OrganizationService.cs` - Organization management service
@@ -79,7 +84,7 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 1.4 Set up Entity Framework Core with PostgreSQL connection
   - [x] 1.5 Create base domain entities and repository interfaces
   - [x] 1.6 Configure logging, CORS, and API versioning
-  - [ ] 1.7 Set up unit and integration test projects with xUnit
+  - [x] 1.7 Set up unit and integration test projects with xUnit
   - [ ] 1.8 Create Docker configuration for containerization
 - [ ] 2.0 Authentication & Multi-Tenant Architecture
   - [ ] 2.1 Implement User and Organization domain entities with relationships
