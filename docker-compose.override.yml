@@ -1,0 +1,50 @@
+version: "3.8"
+
+# Development-specific overrides
+services:
+  sermon-transcription-api:
+    environment:
+      # Override for development debugging
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Serilog__MinimumLevel__Default=Debug
+      - Serilog__MinimumLevel__Override__SermonTranscription=Debug
+      # Development-friendly settings
+      - JwtSettings__ExpirationInMinutes=1440 # 24 hours for development
+    volumes:
+      # Mount source code for development (if using dotnet watch)
+      # Uncomment the following for hot reload during development:
+      # - ./SermonTranscription.Api:/src/SermonTranscription.Api:ro
+      # - ./SermonTranscription.Application:/src/SermonTranscription.Application:ro
+      # - ./SermonTranscription.Domain:/src/SermonTranscription.Domain:ro
+      # - ./SermonTranscription.Infrastructure:/src/SermonTranscription.Infrastructure:ro
+
+      # Development logs with more verbose output
+      - ./logs:/app/logs
+    # Enable debugging port (uncomment if needed)
+    # ports:
+    #   - "5001:5001"  # Debug port
+
+  postgres:
+    environment:
+      # Development database settings
+      - POSTGRES_DB=SermonTranscriptionDb_Dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=dev_password
+    ports:
+      # Expose postgres for development tools
+      - "5432:5432"
+
+  redis:
+    ports:
+      # Expose Redis for development tools
+      - "6379:6379"
+
+  pgadmin:
+    # PgAdmin is typically only needed in development
+    profiles:
+      - dev
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=dev@example.com
+      - PGADMIN_DEFAULT_PASSWORD=devpassword
+    ports:
+      - "5050:80"

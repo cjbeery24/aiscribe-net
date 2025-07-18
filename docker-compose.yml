@@ -1,6 +1,46 @@
 version: "3.8"
 
 services:
+  # Sermon Transcription API
+  sermon-transcription-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sermon-transcription-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=SermonTranscriptionDb_Dev;Username=postgres;Password=dev_password
+      - Redis__ConnectionString=redis:6379
+      - JwtSettings__SecretKey=your-super-secret-jwt-key-for-development-that-is-at-least-32-characters-long
+      - JwtSettings__Issuer=SermonTranscription.Api
+      - JwtSettings__Audience=SermonTranscription.WebApp
+      - JwtSettings__ExpirationInMinutes=60
+      - Serilog__MinimumLevel__Default=Information
+    ports:
+      - "5000:8080"
+    networks:
+      - sermon-transcription-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # Mount logs directory for persistent logging
+      - ./logs:/app/logs
+
   postgres:
     image: postgres:15-alpine
     container_name: sermon-transcription-postgres
