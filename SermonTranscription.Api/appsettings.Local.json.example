@@ -1,0 +1,52 @@
+{
+  "_comment": "Copy this file to appsettings.Local.json and customize for your local development needs",
+  "_note": "This file shows examples of NON-SENSITIVE development overrides only",
+  
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Information",
+      "Microsoft.EntityFrameworkCore": "Information",
+      "SermonTranscription": "Debug"
+    }
+  },
+  
+  "JwtSettings": {
+    "ExpirationInMinutes": 120,
+    "RefreshTokenExpirationInDays": 30
+  },
+  
+  "AllowedOrigins": [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://localhost:3000", 
+    "https://localhost:3001",
+    "http://localhost:5173",
+    "http://localhost:4200",
+    "YOUR_FRONTEND_URL_HERE"
+  ],
+  
+  "ExternalServices": {
+    "Gladia": {
+      "BaseUrl": "https://api.gladia.io",
+      "TimeoutSeconds": 30
+    },
+    "Email": {
+      "FromEmail": "dev@localhost",
+      "FromName": "Sermon Transcription Service (DEV)"
+    }
+  },
+  
+  "Features": {
+    "EnableDetailedErrors": true,
+    "EnableSwagger": true,
+    "EnableCors": true,
+    "EnableSignalRDetailedErrors": true
+  },
+  
+  "Database": {
+    "EnableSensitiveDataLogging": true,
+    "EnableDetailedErrors": true,
+    "CommandTimeout": 30
+  }
+} 

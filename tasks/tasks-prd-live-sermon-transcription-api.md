@@ -12,6 +12,12 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Infrastructure/SermonTranscription.Infrastructure.csproj` - Infrastructure layer with PostgreSQL EF Core, Redis, HTTP clients
 - `SermonTranscription.Tests.Unit/SermonTranscription.Tests.Unit.csproj` - Unit test project with Moq, FluentAssertions
 - `SermonTranscription.Tests.Integration/SermonTranscription.Tests.Integration.csproj` - Integration test project with ASP.NET Core test host
+- `SermonTranscription.Api/Program.cs` - Complete DI configuration with JWT auth, SignalR, CORS, API versioning
+- `SermonTranscription.Application/DependencyInjection.cs` - Application layer service registration
+- `SermonTranscription.Infrastructure/DependencyInjection.cs` - Infrastructure layer service registration with EF Core and Redis
+- `SermonTranscription.Infrastructure/Data/AppDbContext.cs` - Entity Framework database context placeholder
+- `SermonTranscription.Api/appsettings.json` - Production configuration with JWT, connection strings, external services
+- `SermonTranscription.Api/appsettings.Development.json` - Development-specific configuration
 - `SermonTranscription.Api/Controllers/AuthController.cs` - Authentication endpoints (login, register, refresh tokens)
 - `SermonTranscription.Api/Controllers/OrganizationsController.cs` - Organization management endpoints
 - `SermonTranscription.Api/Controllers/UsersController.cs` - User management and profile endpoints
@@ -64,7 +70,7 @@ Based on: `prd-live-sermon-transcription-api.md`
 - [ ] 1.0 Project Foundation & Infrastructure Setup
   - [x] 1.1 Create .NET 8 Web API project with Clean Architecture structure
   - [x] 1.2 Set up project dependencies (Entity Framework Core, SignalR, JWT, etc.)
-  - [ ] 1.3 Configure dependency injection container and service registration
+  - [x] 1.3 Configure dependency injection container and service registration
   - [ ] 1.4 Set up Entity Framework Core with PostgreSQL connection
   - [ ] 1.5 Create base domain entities and repository interfaces
   - [ ] 1.6 Configure logging, CORS, and API versioning

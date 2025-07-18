@@ -377,6 +377,10 @@ FodyWeavers.xsd
 # Custom application settings
 appsettings.Local.json
 appsettings.Production.json
+appsettings.Secrets.json
+
+# User Secrets (already handled by user-secrets tool)
+secrets.json
 
 # Environment variables
 .env
