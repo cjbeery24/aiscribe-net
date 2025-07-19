@@ -15,7 +15,7 @@ public static class DependencyInjection
         // Database Configuration - conditionally register based on environment
         var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
         var connectionString = configuration.GetConnectionString("DefaultConnection");
-        
+
         if (environment == "Test" || connectionString?.Contains(":memory:") == true)
         {
             // Use in-memory database for testing
@@ -58,4 +58,4 @@ public static class DependencyInjection
 
         return services;
     }
-} 
+}

@@ -70,4 +70,4 @@ public class UserRepository : BaseRepository<User>, IUserRepository
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
-} 
+}
