@@ -1,10 +1,12 @@
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application;
 using SermonTranscription.Infrastructure;
@@ -129,7 +131,55 @@ else
 }
 
 // Authorization
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Organization Admin Policy - full access to organization resources
+    options.AddPolicy(AuthorizationPolicies.OrganizationAdmin, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Admin)));
+    
+    // Organization User Policy - can manage transcriptions and view data
+    options.AddPolicy(AuthorizationPolicies.OrganizationUser, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+    
+    // Read Only User Policy - can only view transcriptions
+    options.AddPolicy(AuthorizationPolicies.ReadOnlyUser, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+    
+    // Can Manage Users Policy
+    options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageUsers)));
+    
+    // Can Manage Transcriptions Policy
+    options.AddPolicy(AuthorizationPolicies.CanManageTranscriptions, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+    
+    // Can View Transcriptions Policy
+    options.AddPolicy(AuthorizationPolicies.CanViewTranscriptions, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+    
+    // Can Export Transcriptions Policy
+    options.AddPolicy(AuthorizationPolicies.CanExportTranscriptions, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ExportTranscriptions)));
+    
+    // Organization Member Policy - any active member
+    options.AddPolicy(AuthorizationPolicies.OrganizationMember, policy =>
+        policy.RequireAuthenticatedUser()
+               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Member)));
+    
+    // Authenticated User Policy - any valid JWT token
+    options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
+        policy.RequireAuthenticatedUser());
+});
+
+// Register authorization handlers
+builder.Services.AddScoped<IAuthorizationHandler, OrganizationAuthorizationHandler>();
 
 // API Versioning
 builder.Services.AddApiVersioning(opt =>

@@ -44,8 +44,8 @@ public static class DependencyInjection
             return ConnectionMultiplexer.Connect(redisConnectionString);
         });
 
-        // Repository registrations (to be implemented)
-        // services.AddScoped<IUserRepository, Repositories.UserRepository>();
+        // Repository registrations
+        services.AddScoped<IUserRepository, Repositories.UserRepository>();
         // services.AddScoped<IOrganizationRepository, Repositories.OrganizationRepository>();
         // services.AddScoped<IUserOrganizationRepository, Repositories.UserOrganizationRepository>();
         // services.AddScoped<ITranscriptionRepository, Repositories.TranscriptionRepository>();

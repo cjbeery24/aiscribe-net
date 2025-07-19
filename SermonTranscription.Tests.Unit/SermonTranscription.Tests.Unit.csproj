@@ -28,6 +28,7 @@
     <ProjectReference Include="..\SermonTranscription.Domain\SermonTranscription.Domain.csproj" />
     <ProjectReference Include="..\SermonTranscription.Application\SermonTranscription.Application.csproj" />
     <ProjectReference Include="..\SermonTranscription.Infrastructure\SermonTranscription.Infrastructure.csproj" />
+    <ProjectReference Include="..\SermonTranscription.Api\SermonTranscription.Api.csproj" />
   </ItemGroup>
 
 </Project>

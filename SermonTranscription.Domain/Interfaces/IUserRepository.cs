@@ -10,7 +10,7 @@ public interface IUserRepository : IBaseRepository<User>
     // User-specific query methods
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
-    Task<User?> GetWithOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<User?> GetByIdWithOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default);
     
     // Authentication-related methods
     Task<User?> GetByEmailVerificationTokenAsync(string token, CancellationToken cancellationToken = default);
