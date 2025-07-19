@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
+using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Infrastructure.Configuration;
+using SermonTranscription.Infrastructure.Services;
 
 namespace SermonTranscription.Infrastructure;
 
@@ -13,11 +16,14 @@ public static class DependencyInjection
         var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         
-        if (environment == "Test" || string.IsNullOrEmpty(connectionString) || connectionString.Contains(":memory:"))
+        if (environment == "Test" || connectionString?.Contains(":memory:") == true)
         {
             // Use in-memory database for testing
             services.AddDbContext<Data.AppDbContext>(options =>
-                options.UseInMemoryDatabase("TestDb"));
+            {
+                options.UseInMemoryDatabase("IntegrationTestDb_" + Guid.NewGuid());
+                options.EnableSensitiveDataLogging();
+            });
         }
         else
         {
@@ -26,28 +32,29 @@ public static class DependencyInjection
                 options.UseNpgsql(connectionString));
         }
 
-        // Redis Configuration - only register if connection string is provided
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnectionString))
+        // JWT Configuration
+        services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
+        services.AddScoped<IJwtService, JwtService>();
+
+        // Redis Configuration
+        services.AddSingleton<IConnectionMultiplexer>(provider =>
         {
-            services.AddSingleton<IConnectionMultiplexer>(provider =>
-            {
-                return ConnectionMultiplexer.Connect(redisConnectionString);
-            });
-        }
+            var configuration = provider.GetService<IConfiguration>();
+            var redisConnectionString = configuration?.GetConnectionString("Redis") ?? "localhost:6379";
+            return ConnectionMultiplexer.Connect(redisConnectionString);
+        });
 
-        // HTTP Client Configuration
-        services.AddHttpClient();
+        // Repository registrations (to be implemented)
+        // services.AddScoped<IUserRepository, Repositories.UserRepository>();
+        // services.AddScoped<IOrganizationRepository, Repositories.OrganizationRepository>();
+        // services.AddScoped<IUserOrganizationRepository, Repositories.UserOrganizationRepository>();
+        // services.AddScoped<ITranscriptionRepository, Repositories.TranscriptionRepository>();
+        // services.AddScoped<ITranscriptionSessionRepository, Repositories.TranscriptionSessionRepository>();
+        // services.AddScoped<ISubscriptionRepository, Repositories.SubscriptionRepository>();
 
-        // External Service Configurations (will be implemented later)
-        // services.AddScoped<IGladiaService, GladiaService>();
-        // services.AddScoped<IEmailService, EmailService>();
-        // services.AddScoped<IStripeService, StripeService>();
-
-        // Repository Registrations (will be implemented later)
-        // services.AddScoped<IUserRepository, UserRepository>();
-        // services.AddScoped<IOrganizationRepository, OrganizationRepository>();
-        // services.AddScoped<ITranscriptionRepository, TranscriptionRepository>();
+        // Service registrations (to be implemented)
+        // services.AddScoped<Infrastructure.Services.EmailService>();
+        // services.AddScoped<Infrastructure.Services.StripeService>();
 
         return services;
     }

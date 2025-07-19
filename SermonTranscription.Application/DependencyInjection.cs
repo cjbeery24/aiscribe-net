@@ -1,6 +1,7 @@
-using System.Reflection;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using SermonTranscription.Application.Services;
 
 namespace SermonTranscription.Application;
 
@@ -9,15 +10,13 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         // AutoMapper Configuration
-        services.AddAutoMapper(Assembly.GetExecutingAssembly());
+        services.AddAutoMapper(typeof(DependencyInjection).Assembly);
 
         // FluentValidation Configuration
-        services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+        services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
-        // Application Service Registrations (will be implemented later)
-        // services.AddScoped<IAuthService, AuthService>();
-        // services.AddScoped<ITranscriptionService, TranscriptionService>();
-        // services.AddScoped<IOrganizationService, OrganizationService>();
+        // Service registrations
+        services.AddScoped<IAuthService, AuthService>();
 
         return services;
     }
