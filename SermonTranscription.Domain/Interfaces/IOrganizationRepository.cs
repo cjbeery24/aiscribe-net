@@ -13,7 +13,7 @@ public interface IOrganizationRepository : IBaseRepository<Organization>
     Task<IEnumerable<Organization>> GetActiveOrganizationsAsync(CancellationToken cancellationToken = default);
     
     // Organization management methods
-    Task<Organization?> GetWithUsersAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<Organization?> GetWithUserOrganizationsAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<Organization?> GetWithSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<Organization?> GetWithTranscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default);
     

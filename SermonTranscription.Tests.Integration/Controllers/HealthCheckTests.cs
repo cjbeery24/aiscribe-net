@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using SermonTranscription.Tests.Integration.Common;
 using System.Net;
 
@@ -144,8 +145,11 @@ public class HealthCheckTests : BaseIntegrationTest
         savedUser!.Email.Should().Be(user.Email);
 
         // Verify organization was also created
-        var organization = await DbContext.Organizations.FindAsync(user.OrganizationId);
-        organization.Should().NotBeNull();
-        organization!.Name.Should().Be("Test Organization");
+        var userOrg = await DbContext.UserOrganizations
+            .Include(uo => uo.Organization)
+            .FirstOrDefaultAsync(uo => uo.UserId == user.Id);
+        userOrg.Should().NotBeNull();
+        userOrg!.Organization.Should().NotBeNull();
+        userOrg.Organization.Name.Should().Be("Test Organization");
     }
 } 

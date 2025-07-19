@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     // Domain Entity DbSets
     public DbSet<User> Users { get; set; }
     public DbSet<Organization> Organizations { get; set; }
+    public DbSet<UserOrganization> UserOrganizations { get; set; }
     public DbSet<TranscriptionSession> TranscriptionSessions { get; set; }
     public DbSet<Transcription> Transcriptions { get; set; }
     public DbSet<TranscriptionSegment> TranscriptionSegments { get; set; }
@@ -71,12 +72,28 @@ public class AppDbContext : DbContext
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {
-        // User -> Organization (Many-to-One)
-        modelBuilder.Entity<User>()
-            .HasOne(u => u.Organization)
-            .WithMany(o => o.Users)
-            .HasForeignKey(u => u.OrganizationId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // User <-> Organization (Many-to-Many through UserOrganization)
+        modelBuilder.Entity<UserOrganization>()
+            .HasKey(uo => new { uo.UserId, uo.OrganizationId });
+
+        modelBuilder.Entity<UserOrganization>()
+            .HasOne(uo => uo.User)
+            .WithMany(u => u.UserOrganizations)
+            .HasForeignKey(uo => uo.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserOrganization>()
+            .HasOne(uo => uo.Organization)
+            .WithMany(o => o.UserOrganizations)
+            .HasForeignKey(uo => uo.OrganizationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Self-referencing relationship for invitation tracking
+        modelBuilder.Entity<UserOrganization>()
+            .HasOne(uo => uo.InvitedByUser)
+            .WithMany()
+            .HasForeignKey(uo => uo.InvitedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // TranscriptionSession -> Organization (Many-to-One)
         modelBuilder.Entity<TranscriptionSession>()
@@ -135,8 +152,16 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.Email)
             .IsUnique();
 
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.OrganizationId);
+        // UserOrganization indexes
+        modelBuilder.Entity<UserOrganization>()
+            .HasIndex(uo => uo.UserId);
+
+        modelBuilder.Entity<UserOrganization>()
+            .HasIndex(uo => uo.OrganizationId);
+
+        modelBuilder.Entity<UserOrganization>()
+            .HasIndex(uo => uo.InvitationToken)
+            .IsUnique();
 
         // Organization indexes
         modelBuilder.Entity<Organization>()

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
 
 namespace SermonTranscription.Domain.Entities;
@@ -54,7 +55,7 @@ public class Organization
     public bool HasRealtimeTranscription { get; set; } = true;
     
     // Navigation properties
-    public ICollection<User> Users { get; set; } = new List<User>();
+    public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
     public ICollection<TranscriptionSession> TranscriptionSessions { get; set; } = new List<TranscriptionSession>();
     public ICollection<Transcription> Transcriptions { get; set; } = new List<Transcription>();
     public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
@@ -65,7 +66,7 @@ public class Organization
     // Domain methods
     public bool CanAddUser()
     {
-        return Users.Count < MaxUsers;
+        return GetActiveUserCount() < MaxUsers;
     }
     
     public bool CanCreateTranscription()
@@ -121,12 +122,48 @@ public class Organization
     
     public int GetActiveUserCount()
     {
-        return Users.Count(u => u.IsActive);
+        return UserOrganizations.Count(uo => uo.IsActive);
     }
     
     public bool CanAddMoreUsers()
     {
         return GetActiveUserCount() < MaxUsers;
+    }
+    
+    /// <summary>
+    /// Get all active users in this organization
+    /// </summary>
+    public IEnumerable<User> GetActiveUsers()
+    {
+        return UserOrganizations
+            .Where(uo => uo.IsActive)
+            .Select(uo => uo.User);
+    }
+    
+    /// <summary>
+    /// Get all admin users in this organization
+    /// </summary>
+    public IEnumerable<User> GetAdminUsers()
+    {
+        return UserOrganizations
+            .Where(uo => uo.IsActive && uo.Role == UserRole.OrganizationAdmin)
+            .Select(uo => uo.User);
+    }
+    
+    /// <summary>
+    /// Check if a user is a member of this organization
+    /// </summary>
+    public bool HasUser(Guid userId)
+    {
+        return UserOrganizations.Any(uo => uo.UserId == userId && uo.IsActive);
+    }
+    
+    /// <summary>
+    /// Get a user's membership in this organization
+    /// </summary>
+    public UserOrganization? GetUserMembership(Guid userId)
+    {
+        return UserOrganizations.FirstOrDefault(uo => uo.UserId == userId && uo.IsActive);
     }
     
     public void UpdateSubscriptionLimits(int maxUsers, int maxTranscriptionHours, bool canExport, bool hasRealtime)

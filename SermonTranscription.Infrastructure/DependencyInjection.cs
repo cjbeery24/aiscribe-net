@@ -9,17 +9,32 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Database Configuration
-        services.AddDbContext<Data.AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
-
-        // Redis Configuration
-        services.AddSingleton<IConnectionMultiplexer>(provider =>
+        // Database Configuration - conditionally register based on environment
+        var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        
+        if (environment == "Test" || string.IsNullOrEmpty(connectionString) || connectionString.Contains(":memory:"))
         {
-            var configuration = provider.GetService<IConfiguration>();
-            var connectionString = configuration.GetConnectionString("Redis");
-            return ConnectionMultiplexer.Connect(connectionString);
-        });
+            // Use in-memory database for testing
+            services.AddDbContext<Data.AppDbContext>(options =>
+                options.UseInMemoryDatabase("TestDb"));
+        }
+        else
+        {
+            // Use PostgreSQL for production/development
+            services.AddDbContext<Data.AppDbContext>(options =>
+                options.UseNpgsql(connectionString));
+        }
+
+        // Redis Configuration - only register if connection string is provided
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            services.AddSingleton<IConnectionMultiplexer>(provider =>
+            {
+                return ConnectionMultiplexer.Connect(redisConnectionString);
+            });
+        }
 
         // HTTP Client Configuration
         services.AddHttpClient();

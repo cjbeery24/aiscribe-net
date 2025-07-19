@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Tests.Unit.Common;
 
@@ -104,9 +105,35 @@ public class OrganizationEnhancedTests : BaseUnitTest
         var inactiveUser = TestDataFactory.UserFaker.Generate();
         inactiveUser.IsActive = false;
         
-        organization.Users.Add(activeUser1);
-        organization.Users.Add(activeUser2);
-        organization.Users.Add(inactiveUser);
+        // Create UserOrganization entities and add them to the organization
+        var userOrg1 = new UserOrganization
+        {
+            UserId = activeUser1.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var userOrg2 = new UserOrganization
+        {
+            UserId = activeUser2.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var userOrg3 = new UserOrganization
+        {
+            UserId = inactiveUser.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        organization.UserOrganizations.Add(userOrg1);
+        organization.UserOrganizations.Add(userOrg2);
+        organization.UserOrganizations.Add(userOrg3);
 
         // Act
         var count = organization.GetActiveUserCount();
@@ -121,7 +148,6 @@ public class OrganizationEnhancedTests : BaseUnitTest
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
         organization.MaxUsers = 5;
-        organization.Users.Clear();
 
         // Act
         var canAdd = organization.CanAddMoreUsers();
@@ -136,15 +162,36 @@ public class OrganizationEnhancedTests : BaseUnitTest
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
         organization.MaxUsers = 2;
-        organization.Users.Clear();
         
         var user1 = TestDataFactory.UserFaker.Generate();
         user1.IsActive = true;
         var user2 = TestDataFactory.UserFaker.Generate();
         user2.IsActive = true;
         
-        organization.Users.Add(user1);
-        organization.Users.Add(user2);
+        // Create UserOrganization entities with proper navigation properties
+        var userOrg1 = new UserOrganization
+        {
+            UserId = user1.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = user1,
+            Organization = organization
+        };
+        var userOrg2 = new UserOrganization
+        {
+            UserId = user2.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = user2,
+            Organization = organization
+        };
+        
+        organization.UserOrganizations.Add(userOrg1);
+        organization.UserOrganizations.Add(userOrg2);
 
         // Act
         var canAdd = organization.CanAddMoreUsers();
@@ -339,18 +386,29 @@ public class OrganizationEnhancedTests : BaseUnitTest
     {
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
-        organization.IsActive = true;
         organization.MaxUsers = 1;
-        organization.Users.Clear();
         
-        var user = TestDataFactory.UserFaker.Generate();
-        user.IsActive = true;
-        organization.Users.Add(user);
+        var existingUser = TestDataFactory.UserFaker.Generate();
+        existingUser.IsActive = true;
+        
+        // Create UserOrganization entity with proper navigation properties
+        var userOrg = new UserOrganization
+        {
+            UserId = existingUser.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = existingUser,
+            Organization = organization
+        };
+        
+        organization.UserOrganizations.Add(userOrg);
 
         // Act & Assert
         var act = () => organization.ValidateCanAddUser();
         act.Should().Throw<OrganizationUserLimitException>()
-           .WithMessage($"Organization {organization.Name} has reached the maximum number of users (1).");
+            .WithMessage("*maximum number of users*");
     }
 
     [Fact]

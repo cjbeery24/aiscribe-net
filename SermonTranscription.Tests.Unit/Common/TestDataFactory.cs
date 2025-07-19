@@ -44,8 +44,20 @@ public static class TestDataFactory
         .RuleFor(u => u.CreatedAt, f => f.Date.Past())
         .RuleFor(u => u.UpdatedAt, (f, u) => f.Date.Between(u.CreatedAt, DateTime.UtcNow))
         .RuleFor(u => u.LastLoginAt, (f, u) => f.Date.Between(u.CreatedAt, DateTime.UtcNow))
-        .RuleFor(u => u.IsActive, f => f.Random.Bool(0.9f))
-        .RuleFor(u => u.OrganizationId, f => f.Random.Guid());
+        .RuleFor(u => u.IsActive, f => f.Random.Bool(0.9f));
+
+    /// <summary>
+    /// Generate a fake UserOrganization relationship with realistic data
+    /// </summary>
+    public static Faker<UserOrganization> UserOrganizationFaker => new Faker<UserOrganization>()
+        .RuleFor(uo => uo.UserId, f => f.Random.Guid())
+        .RuleFor(uo => uo.OrganizationId, f => f.Random.Guid())
+        .RuleFor(uo => uo.Role, f => f.PickRandom<UserRole>())
+        .RuleFor(uo => uo.CreatedAt, f => f.Date.Past())
+        .RuleFor(uo => uo.UpdatedAt, (f, uo) => f.Date.Between(uo.CreatedAt, DateTime.UtcNow))
+        .RuleFor(uo => uo.IsActive, f => f.Random.Bool(0.9f))
+        .RuleFor(uo => uo.InvitationAcceptedAt, (f, uo) => f.Random.Bool(0.8f) ? f.Date.Between(uo.CreatedAt, DateTime.UtcNow) : null)
+        .RuleFor(uo => uo.InvitedByUserId, f => f.Random.Bool(0.5f) ? f.Random.Guid() : null);
 
     /// <summary>
     /// Generate a fake TranscriptionSession with realistic data
@@ -75,7 +87,6 @@ public static class TestDataFactory
         .RuleFor(t => t.Description, f => f.Lorem.Paragraph())
         .RuleFor(t => t.Content, f => f.Lorem.Paragraphs(3, 8))
         .RuleFor(t => t.Speaker, f => f.Person.FullName)
-
         .RuleFor(t => t.ProcessedAt, f => f.Date.Past())
         .RuleFor(t => t.CreatedAt, f => f.Date.Past())
         .RuleFor(t => t.UpdatedAt, (f, t) => f.Date.Between(t.CreatedAt, DateTime.UtcNow))
@@ -101,7 +112,6 @@ public static class TestDataFactory
         .RuleFor(s => s.MaxUsers, (f, s) => GetMaxUsersForPlan(s.Plan))
         .RuleFor(s => s.MaxTranscriptionHours, (f, s) => GetMaxHoursForPlan(s.Plan))
         .RuleFor(s => s.CanExportTranscriptions, (f, s) => s.Plan != SubscriptionPlan.Basic)
-
         .RuleFor(s => s.CreatedAt, f => f.Date.Past())
         .RuleFor(s => s.UpdatedAt, (f, s) => f.Date.Between(s.CreatedAt, DateTime.UtcNow))
         .RuleFor(s => s.OrganizationId, f => f.Random.Guid());
@@ -145,27 +155,63 @@ public static class TestDataFactory
     };
 
     /// <summary>
-    /// Create a complete organization with users and subscription
+    /// Create a complete organization with users and subscription using many-to-many relationship
     /// </summary>
-    public static (Organization organization, List<User> users, Subscription subscription) CreateCompleteOrganization(int userCount = 3)
+    public static (Organization organization, List<User> users, List<UserOrganization> userOrganizations, Subscription subscription) CreateCompleteOrganization(int userCount = 3)
     {
         var organization = OrganizationFaker.Generate();
-        
         var users = UserFaker.Generate(userCount);
-        foreach (var user in users)
+        var userOrganizations = new List<UserOrganization>();
+
+        // Create UserOrganization relationships
+        for (int i = 0; i < users.Count; i++)
         {
-            user.OrganizationId = organization.Id;
-            user.Organization = organization;
+            var user = users[i];
+            var role = i == 0 ? UserRole.OrganizationAdmin : UserRole.OrganizationUser; // First user is admin
+            
+            var userOrganization = new UserOrganization
+            {
+                UserId = user.Id,
+                OrganizationId = organization.Id,
+                Role = role,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true,
+                User = user,
+                Organization = organization
+            };
+            
+            userOrganizations.Add(userOrganization);
+            user.UserOrganizations.Add(userOrganization);
         }
 
         var subscription = SubscriptionFaker.Generate();
         subscription.OrganizationId = organization.Id;
         subscription.Organization = organization;
 
-        organization.Users = users;
+        organization.UserOrganizations = userOrganizations;
         organization.Subscriptions = new List<Subscription> { subscription };
 
-        return (organization, users, subscription);
+        return (organization, users, userOrganizations, subscription);
+    }
+
+    /// <summary>
+    /// Create a user with membership in a specific organization
+    /// </summary>
+    public static (User user, UserOrganization membership) CreateUserWithOrganization(Guid organizationId, UserRole role = UserRole.OrganizationUser)
+    {
+        var user = UserFaker.Generate();
+        var membership = new UserOrganization
+        {
+            UserId = user.Id,
+            OrganizationId = organizationId,
+            Role = role,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true,
+            User = user
+        };
+        
+        user.UserOrganizations.Add(membership);
+        return (user, membership);
     }
 
     /// <summary>

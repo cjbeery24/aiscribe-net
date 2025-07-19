@@ -1,6 +1,8 @@
 using FluentAssertions;
 using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
 using SermonTranscription.Tests.Unit.Common;
+using Microsoft.EntityFrameworkCore;
 
 namespace SermonTranscription.Tests.Unit.Entities;
 
@@ -127,21 +129,39 @@ public class UserTests : BaseUnitTest
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
         var user = TestDataFactory.UserFaker.Generate();
-        user.OrganizationId = organization.Id;
+        
+        // Create UserOrganization entity with proper navigation properties
+        var userOrg = new UserOrganization
+        {
+            UserId = user.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = user,
+            Organization = organization
+        };
+        
+        user.UserOrganizations.Add(userOrg);
+        organization.UserOrganizations.Add(userOrg);
 
         // Act
         DbContext.Organizations.Add(organization);
         DbContext.Users.Add(user);
+        DbContext.Set<UserOrganization>().Add(userOrg);
         var saveResult = await SaveAndDetachAllAsync();
 
         // Assert
-        saveResult.Should().Be(2); // 1 organization + 1 user
+        saveResult.Should().Be(3); // 1 organization + 1 user + 1 user organization
 
         // Verify in database
-        var savedUser = await DbContext.Users.FindAsync(user.Id);
+        var savedUser = await DbContext.Users
+            .Include(u => u.UserOrganizations)
+            .FirstOrDefaultAsync(u => u.Id == user.Id);
         savedUser.Should().NotBeNull();
         savedUser!.Email.Should().Be(user.Email);
-        savedUser.OrganizationId.Should().Be(organization.Id);
+        savedUser.UserOrganizations.Should().HaveCount(1);
+        savedUser.UserOrganizations.First().OrganizationId.Should().Be(organization.Id);
     }
 
     [Fact]
@@ -155,8 +175,33 @@ public class UserTests : BaseUnitTest
         // Set same email for both users
         user1.Email = "duplicate@example.com";
         user2.Email = "duplicate@example.com";
-        user1.OrganizationId = organization.Id;
-        user2.OrganizationId = organization.Id;
+        
+        // Create UserOrganization entities for both users
+        var userOrg1 = new UserOrganization
+        {
+            UserId = user1.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = user1,
+            Organization = organization
+        };
+        var userOrg2 = new UserOrganization
+        {
+            UserId = user2.Id,
+            OrganizationId = organization.Id,
+            Role = UserRole.OrganizationUser,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            User = user2,
+            Organization = organization
+        };
+        
+        user1.UserOrganizations.Add(userOrg1);
+        user2.UserOrganizations.Add(userOrg2);
+        organization.UserOrganizations.Add(userOrg1);
+        organization.UserOrganizations.Add(userOrg2);
 
         DbContext.Organizations.Add(organization);
         DbContext.Users.Add(user1);

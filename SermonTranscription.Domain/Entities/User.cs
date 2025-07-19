@@ -37,13 +37,8 @@ public class User
     
     public bool IsActive { get; set; } = true;
     
-    // Role and permissions
-    public UserRole Role { get; set; } = UserRole.OrganizationUser;
-    
     // Navigation properties
-    public Guid OrganizationId { get; set; }
-    public Organization Organization { get; set; } = null!;
-    
+    public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
     public ICollection<TranscriptionSession> TranscriptionSessions { get; set; } = new List<TranscriptionSession>();
     public ICollection<Transcription> CreatedTranscriptions { get; set; } = new List<Transcription>();
     
@@ -79,38 +74,125 @@ public class User
         UpdatedAt = DateTime.UtcNow;
     }
     
-    // Role-based permission methods
-    public bool IsAdmin()
+    // Organization-related helper methods
+    
+    /// <summary>
+    /// Get user's membership in a specific organization
+    /// </summary>
+    public UserOrganization? GetOrganizationMembership(Guid organizationId)
     {
-        return Role == UserRole.OrganizationAdmin;
+        return UserOrganizations.FirstOrDefault(uo => uo.OrganizationId == organizationId && uo.IsActive);
     }
     
-    public bool CanManageUsers()
+    /// <summary>
+    /// Get all organizations where the user is active
+    /// </summary>
+    public IEnumerable<Organization> GetActiveOrganizations()
     {
-        return Role == UserRole.OrganizationAdmin;
+        return UserOrganizations
+            .Where(uo => uo.IsActive)
+            .Select(uo => uo.Organization);
     }
     
-    public bool CanManageTranscriptions()
+    /// <summary>
+    /// Check if user is an admin in a specific organization
+    /// </summary>
+    public bool IsAdmin(Guid organizationId)
     {
-        return Role == UserRole.OrganizationAdmin || Role == UserRole.OrganizationUser;
+        var membership = GetOrganizationMembership(organizationId);
+        return membership?.IsAdmin() ?? false;
     }
     
-    public bool CanViewTranscriptions()
+    /// <summary>
+    /// Check if user can manage users in a specific organization
+    /// </summary>
+    public bool CanManageUsers(Guid organizationId)
     {
-        return IsActive && (Role == UserRole.OrganizationAdmin || 
-                           Role == UserRole.OrganizationUser || 
-                           Role == UserRole.ReadOnlyUser);
+        var membership = GetOrganizationMembership(organizationId);
+        return membership?.CanManageUsers() ?? false;
     }
     
-    public bool CanExportTranscriptions()
+    /// <summary>
+    /// Check if user can manage transcriptions in a specific organization
+    /// </summary>
+    public bool CanManageTranscriptions(Guid organizationId)
     {
-        return Role == UserRole.OrganizationAdmin || Role == UserRole.OrganizationUser;
+        var membership = GetOrganizationMembership(organizationId);
+        return membership?.CanManageTranscriptions() ?? false;
     }
     
-    public void UpdateRole(UserRole newRole)
+    /// <summary>
+    /// Check if user can view transcriptions in a specific organization
+    /// </summary>
+    public bool CanViewTranscriptions(Guid organizationId)
     {
-        Role = newRole;
+        var membership = GetOrganizationMembership(organizationId);
+        return IsActive && (membership?.CanViewTranscriptions() ?? false);
+    }
+    
+    /// <summary>
+    /// Check if user can export transcriptions from a specific organization
+    /// </summary>
+    public bool CanExportTranscriptions(Guid organizationId)
+    {
+        var membership = GetOrganizationMembership(organizationId);
+        return membership?.CanExportTranscriptions() ?? false;
+    }
+    
+    /// <summary>
+    /// Update user's role in a specific organization
+    /// </summary>
+    public void UpdateRoleInOrganization(Guid organizationId, UserRole newRole)
+    {
+        var membership = GetOrganizationMembership(organizationId);
+        if (membership != null)
+        {
+            membership.UpdateRole(newRole);
+            UpdatedAt = DateTime.UtcNow;
+        }
+    }
+    
+    /// <summary>
+    /// Join an organization with a specific role
+    /// </summary>
+    public void JoinOrganization(Guid organizationId, UserRole role = UserRole.OrganizationUser, Guid? invitedByUserId = null)
+    {
+        // Check if already a member
+        var existingMembership = UserOrganizations.FirstOrDefault(uo => uo.OrganizationId == organizationId);
+        if (existingMembership != null)
+        {
+            // Reactivate if was previously deactivated
+            existingMembership.Activate();
+            existingMembership.UpdateRole(role);
+        }
+        else
+        {
+            // Create new membership
+            var membership = new UserOrganization
+            {
+                UserId = Id,
+                OrganizationId = organizationId,
+                Role = role,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true,
+                InvitedByUserId = invitedByUserId
+            };
+            UserOrganizations.Add(membership);
+        }
         UpdatedAt = DateTime.UtcNow;
+    }
+    
+    /// <summary>
+    /// Leave an organization (deactivate membership)
+    /// </summary>
+    public void LeaveOrganization(Guid organizationId)
+    {
+        var membership = GetOrganizationMembership(organizationId);
+        if (membership != null)
+        {
+            membership.Deactivate();
+            UpdatedAt = DateTime.UtcNow;
+        }
     }
     
     public void Deactivate()
@@ -146,35 +228,53 @@ public class User
     }
     
     // Validation methods
-    public void ValidateCanManageUsers()
+    public void ValidateCanManageUsers(Guid organizationId)
     {
-        if (!CanManageUsers())
+        if (!CanManageUsers(organizationId))
         {
-            throw new UserPermissionException($"User {Email} does not have permission to manage users.");
+            throw new UserPermissionException($"User {Email} does not have permission to manage users in organization {organizationId}.");
         }
     }
     
-    public void ValidateCanManageTranscriptions()
+    public void ValidateCanManageTranscriptions(Guid organizationId)
     {
-        if (!CanManageTranscriptions())
+        if (!CanManageTranscriptions(organizationId))
         {
-            throw new UserPermissionException($"User {Email} does not have permission to manage transcriptions.");
+            throw new UserPermissionException($"User {Email} does not have permission to manage transcriptions in organization {organizationId}.");
         }
     }
     
-    public void ValidateCanViewTranscriptions()
+    public void ValidateCanViewTranscriptions(Guid organizationId)
     {
-        if (!CanViewTranscriptions())
+        if (!CanViewTranscriptions(organizationId))
         {
-            throw new UserPermissionException($"User {Email} does not have permission to view transcriptions.");
+            throw new UserPermissionException($"User {Email} does not have permission to view transcriptions in organization {organizationId}.");
         }
     }
     
-    public void ValidateCanExportTranscriptions()
+    public void ValidateCanExportTranscriptions(Guid organizationId)
     {
-        if (!CanExportTranscriptions())
+        if (!CanExportTranscriptions(organizationId))
         {
-            throw new UserPermissionException($"User {Email} does not have permission to export transcriptions.");
+            throw new UserPermissionException($"User {Email} does not have permission to export transcriptions in organization {organizationId}.");
+        }
+    }
+    
+    public void ValidateIsMemberOfOrganization(Guid organizationId)
+    {
+        var membership = GetOrganizationMembership(organizationId);
+        if (membership == null)
+        {
+            throw new UserPermissionException($"User {Email} is not a member of organization {organizationId}.");
+        }
+    }
+    
+    public void ValidateIsActiveInOrganization(Guid organizationId)
+    {
+        var membership = GetOrganizationMembership(organizationId);
+        if (membership == null || !membership.IsActive)
+        {
+            throw new UserPermissionException($"User {Email} is not active in organization {organizationId}.");
         }
     }
     
