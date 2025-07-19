@@ -35,46 +35,47 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     Log.Information("Starting Sermon Transcription API");
-    
-var builder = WebApplication.CreateBuilder(args);
 
-// Add Serilog as the logging provider and configure it to read from config
-builder.Host.UseSerilog((context, services, configuration) => configuration
-    .ReadFrom.Configuration(context.Configuration)
-    .ReadFrom.Services(services)
-    .Enrich.FromLogContext());
+    var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
+    // Add Serilog as the logging provider and configure it to read from config
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext());
 
-// Layer Dependencies
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+    // Add services to the container
 
-// Controllers and API Explorer
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+    // Layer Dependencies
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
-// Swagger/OpenAPI Configuration
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { 
-        Title = "Sermon Transcription API", 
-        Version = "v1",
-        Description = "REST API for live sermon transcription service"
-    });
-    
-    // JWT Authentication in Swagger
-    c.AddSecurityDefinition("Bearer", new()
+    // Controllers and API Explorer
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+
+    // Swagger/OpenAPI Configuration
+    builder.Services.AddSwaggerGen(c =>
     {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
-        Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    
-    c.AddSecurityRequirement(new()
-    {
+        c.SwaggerDoc("v1", new()
+        {
+            Title = "Sermon Transcription API",
+            Version = "v1",
+            Description = "REST API for live sermon transcription service"
+        });
+
+        // JWT Authentication in Swagger
+        c.AddSecurityDefinition("Bearer", new()
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+            Name = "Authorization",
+            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+            Scheme = "Bearer"
+        });
+
+        c.AddSecurityRequirement(new()
+        {
         {
             new()
             {
@@ -82,179 +83,183 @@ builder.Services.AddSwaggerGen(c =>
             },
             new string[] {}
         }
-    });
-});
-
-// JWT Authentication Configuration
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"];
-
-// Only configure JWT authentication if SecretKey is provided
-if (!string.IsNullOrEmpty(secretKey))
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
-        {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtSettings["Issuer"],
-                ValidAudience = jwtSettings["Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-                ClockSkew = TimeSpan.Zero
-            };
-            
-            // Configure JWT in SignalR
-            options.Events = new JwtBearerEvents
-            {
-                OnMessageReceived = context =>
-                {
-                    var accessToken = context.Request.Query["access_token"];
-                    var path = context.HttpContext.Request.Path;
-                    
-                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
-                    {
-                        context.Token = accessToken;
-                    }
-                    return Task.CompletedTask;
-                }
-            };
         });
-}
-else
-{
-    // For testing environments, skip authentication configuration
-    // This allows the application to start without JWT configuration
-}
-
-// Authorization
-builder.Services.AddAuthorization(options =>
-{
-    // Organization Admin Policy - full access to organization resources
-    options.AddPolicy(AuthorizationPolicies.OrganizationAdmin, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Admin)));
-    
-    // Organization User Policy - can manage transcriptions and view data
-    options.AddPolicy(AuthorizationPolicies.OrganizationUser, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
-    
-    // Read Only User Policy - can only view transcriptions
-    options.AddPolicy(AuthorizationPolicies.ReadOnlyUser, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
-    
-    // Can Manage Users Policy
-    options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageUsers)));
-    
-    // Can Manage Transcriptions Policy
-    options.AddPolicy(AuthorizationPolicies.CanManageTranscriptions, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
-    
-    // Can View Transcriptions Policy
-    options.AddPolicy(AuthorizationPolicies.CanViewTranscriptions, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
-    
-    // Can Export Transcriptions Policy
-    options.AddPolicy(AuthorizationPolicies.CanExportTranscriptions, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ExportTranscriptions)));
-    
-    // Organization Member Policy - any active member
-    options.AddPolicy(AuthorizationPolicies.OrganizationMember, policy =>
-        policy.RequireAuthenticatedUser()
-               .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Member)));
-    
-    // Authenticated User Policy - any valid JWT token
-    options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
-        policy.RequireAuthenticatedUser());
-});
-
-// Register authorization handlers
-builder.Services.AddScoped<IAuthorizationHandler, OrganizationAuthorizationHandler>();
-
-// API Versioning
-builder.Services.AddApiVersioning(opt =>
-{
-    opt.DefaultApiVersion = new ApiVersion(1, 0);
-    opt.AssumeDefaultVersionWhenUnspecified = true;
-    opt.ApiVersionReader = ApiVersionReader.Combine(
-        new UrlSegmentApiVersionReader(),
-        new QueryStringApiVersionReader("apiVersion"),
-        new HeaderApiVersionReader("X-Version"),
-        new MediaTypeApiVersionReader("ver")
-    );
-});
-
-// SignalR
-builder.Services.AddSignalR();
-
-// CORS Configuration
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? new[] { "http://localhost:3000" })
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // Required for SignalR
     });
-});
 
-// FluentValidation
-builder.Services.AddFluentValidationAutoValidation()
-                .AddFluentValidationClientsideAdapters();
+    // JWT Authentication Configuration
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var secretKey = jwtSettings["SecretKey"];
 
-// Health Checks
-builder.Services.AddHealthChecks();
-
-// Build the application
-var app = builder.Build();
-
-// Configure the HTTP request pipeline
-
-// Development Environment
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    // Only configure JWT authentication if SecretKey is provided
+    if (!string.IsNullOrEmpty(secretKey))
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sermon Transcription API V1");
-        c.RoutePrefix = string.Empty; // Serve Swagger UI at root
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidAudience = jwtSettings["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                // Configure JWT in SignalR
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
+            });
+    }
+    else
+    {
+        // For testing environments, skip authentication configuration
+        // This allows the application to start without JWT configuration
+    }
+
+    // Authorization
+    builder.Services.AddAuthorization(options =>
+    {
+        // Organization Admin Policy - full access to organization resources
+        options.AddPolicy(AuthorizationPolicies.OrganizationAdmin, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Admin)));
+
+        // Organization User Policy - can manage transcriptions and view data
+        options.AddPolicy(AuthorizationPolicies.OrganizationUser, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+
+        // Read Only User Policy - can only view transcriptions
+        options.AddPolicy(AuthorizationPolicies.ReadOnlyUser, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+
+        // Can Manage Users Policy
+        options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageUsers)));
+
+        // Can Manage Transcriptions Policy
+        options.AddPolicy(AuthorizationPolicies.CanManageTranscriptions, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+
+        // Can View Transcriptions Policy
+        options.AddPolicy(AuthorizationPolicies.CanViewTranscriptions, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+
+        // Can Export Transcriptions Policy
+        options.AddPolicy(AuthorizationPolicies.CanExportTranscriptions, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ExportTranscriptions)));
+
+        // Organization Member Policy - any active member
+        options.AddPolicy(AuthorizationPolicies.OrganizationMember, policy =>
+            policy.RequireAuthenticatedUser()
+                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Member)));
+
+        // Authenticated User Policy - any valid JWT token
+        options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
+            policy.RequireAuthenticatedUser());
     });
-}
 
-// Security Headers
-app.UseHttpsRedirection();
+    // Register authorization handlers
+    builder.Services.AddScoped<IAuthorizationHandler, OrganizationAuthorizationHandler>();
 
-// Request/Response Logging (before authentication to capture all requests)
-app.UseMiddleware<RequestResponseLoggingMiddleware>();
+    // API Versioning
+    builder.Services.AddApiVersioning(opt =>
+    {
+        opt.DefaultApiVersion = new ApiVersion(1, 0);
+        opt.AssumeDefaultVersionWhenUnspecified = true;
+        opt.ApiVersionReader = ApiVersionReader.Combine(
+            new UrlSegmentApiVersionReader(),
+            new QueryStringApiVersionReader("apiVersion"),
+            new HeaderApiVersionReader("X-Version"),
+            new MediaTypeApiVersionReader("ver")
+        );
+    });
 
-// CORS
-app.UseCors("AllowFrontend");
+    // SignalR
+    builder.Services.AddSignalR();
 
-// Authentication & Authorization
-app.UseAuthentication();
-app.UseAuthorization();
+    // CORS Configuration
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowFrontend", policy =>
+        {
+            policy.WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? new[] { "http://localhost:3000" })
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials(); // Required for SignalR
+        });
+    });
 
-// Controllers
-app.MapControllers();
+    // FluentValidation
+    builder.Services.AddFluentValidationAutoValidation()
+                    .AddFluentValidationClientsideAdapters();
 
-// SignalR Hubs (will be implemented later)
-// app.MapHub<TranscriptionHub>("/hubs/transcription");
+    // Health Checks
+    builder.Services.AddHealthChecks();
 
-// Health Checks
-app.MapHealthChecks("/health");
+    // Build the application
+    var app = builder.Build();
 
-app.Run();
+    // Configure the HTTP request pipeline
+
+    // Development Environment
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sermon Transcription API V1");
+            c.RoutePrefix = string.Empty; // Serve Swagger UI at root
+        });
+    }
+
+    // Security Headers
+    app.UseHttpsRedirection();
+
+    // Request/Response Logging (before authentication to capture all requests)
+    app.UseMiddleware<RequestResponseLoggingMiddleware>();
+
+    // CORS
+    app.UseCors("AllowFrontend");
+
+    // Authentication & Authorization
+    app.UseAuthentication();
+
+    // Multi-tenant middleware (after authentication, before authorization)
+    app.UseMiddleware<TenantMiddleware>();
+
+    app.UseAuthorization();
+
+    // Controllers
+    app.MapControllers();
+
+    // SignalR Hubs (will be implemented later)
+    // app.MapHub<TranscriptionHub>("/hubs/transcription");
+
+    // Health Checks
+    app.MapHealthChecks("/health");
+
+    app.Run();
 
 }
 catch (Exception ex)
