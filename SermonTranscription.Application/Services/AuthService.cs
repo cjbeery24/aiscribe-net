@@ -86,7 +86,7 @@ public class AuthService : IAuthService
 
             // Generate tokens
             var accessToken = _jwtService.GenerateAccessToken(user, primaryMembership.OrganizationId, primaryMembership.Role.ToString());
-            var refreshToken = _jwtService.GenerateRefreshToken(user);
+            var refreshToken = await IssueRefreshTokenAsync(user);
 
             // Update user's last login
             user.LastLoginAt = DateTime.UtcNow;
@@ -170,16 +170,133 @@ public class AuthService : IAuthService
     {
         try
         {
-            // In a real implementation, you would validate the refresh token against a database
-            // For now, we'll return an error indicating this needs to be implemented
-            _logger.LogWarning("Refresh token functionality not yet implemented");
-            return AuthResult.Failure("Refresh token functionality not yet implemented");
+            // Validate input
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return AuthResult.Failure("Refresh token is required");
+            }
+
+            // Get refresh token from database
+            var storedRefreshToken = await _userRepository.GetRefreshTokenAsync(refreshToken);
+            if (storedRefreshToken == null)
+            {
+                _logger.LogWarning("Refresh token not found: {Token}", refreshToken);
+                return AuthResult.Failure("Invalid refresh token");
+            }
+
+            // Check if token is expired
+            if (storedRefreshToken.ExpiresAt < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Refresh token expired for user: {UserId}", storedRefreshToken.UserId);
+                await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+                return AuthResult.Failure("Refresh token has expired");
+            }
+
+            // Check if token is revoked
+            if (storedRefreshToken.RevokedAt.HasValue)
+            {
+                _logger.LogWarning("Refresh token revoked for user: {UserId}", storedRefreshToken.UserId);
+                return AuthResult.Failure("Refresh token has been revoked");
+            }
+
+            // Get user and validate they are still active
+            var user = storedRefreshToken.User;
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Refresh token used for inactive user: {UserId}", user.Id);
+                await _userRepository.RevokeAllUserRefreshTokensAsync(user.Id);
+                return AuthResult.Failure("User account is deactivated");
+            }
+
+            // Get user's primary organization membership
+            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(user.Id);
+            var primaryMembership = memberships.FirstOrDefault(m => m.IsActive);
+            if (primaryMembership == null)
+            {
+                _logger.LogWarning("User {UserId} has no active organization membership", user.Id);
+                return AuthResult.Failure("User is not associated with any organization");
+            }
+
+            // Generate new tokens
+            var newAccessToken = _jwtService.GenerateAccessToken(user, primaryMembership.OrganizationId, primaryMembership.Role.ToString());
+            var newRefreshToken = _jwtService.GenerateRefreshToken(user);
+
+            // Revoke the old refresh token and add the new one
+            await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+
+            var newStoredRefreshToken = new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Token = newRefreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(30), // 30 days expiry
+                CreatedAt = DateTime.UtcNow
+            };
+            await _userRepository.AddRefreshTokenAsync(newStoredRefreshToken);
+
+            // Update user's last login
+            user.UpdateLastLogin();
+            await _userRepository.UpdateAsync(user);
+
+            _logger.LogInformation("Successfully refreshed tokens for user {UserId}", user.Id);
+
+            return AuthResult.Success(newAccessToken, newRefreshToken, new AuthUserInfo
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                OrganizationId = primaryMembership.OrganizationId,
+                Role = primaryMembership.Role.ToString()
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during token refresh");
             return AuthResult.Failure("An error occurred during token refresh");
         }
+    }
+
+    public async Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return AuthResult.Failure("Refresh token is required");
+            }
+
+            // Revoke the refresh token
+            await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+
+            _logger.LogInformation("Refresh token revoked: {Token}", refreshToken);
+
+            return AuthResult.Success("Refresh token revoked successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking refresh token");
+            return AuthResult.Failure("An error occurred while revoking the refresh token");
+        }
+    }
+
+    private async Task<string> IssueRefreshTokenAsync(User user)
+    {
+        var refreshToken = _jwtService.GenerateRefreshToken(user);
+
+        var storedRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(30), // 30 days expiry
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _userRepository.AddRefreshTokenAsync(storedRefreshToken);
+
+        return refreshToken;
     }
 
     public async Task<AuthResult> ValidateTokenAsync(string token)
@@ -340,6 +457,7 @@ public interface IAuthService
     Task<AuthResult> LoginAsync(string email, string password);
     Task<AuthResult> RegisterAsync(RegisterRequest request);
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
+    Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken);
     Task<AuthResult> ValidateTokenAsync(string token);
     Task<AuthResult> ForgotPasswordAsync(string email);
     Task<AuthResult> ResetPasswordAsync(string token, string newPassword);

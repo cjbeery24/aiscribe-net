@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<Transcription> Transcriptions { get; set; }
     public DbSet<TranscriptionSegment> TranscriptionSegments { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -143,6 +144,13 @@ public class AppDbContext : DbContext
             .WithMany(o => o.Subscriptions)
             .HasForeignKey(s => s.OrganizationId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // User -> RefreshToken (One-to-Many)
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(rt => rt.User)
+            .WithMany(u => u.RefreshTokens)
+            .HasForeignKey(rt => rt.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     private static void ConfigureIndexes(ModelBuilder modelBuilder)
@@ -213,7 +221,7 @@ public class AppDbContext : DbContext
     {
         // Seed default organization for development
         var defaultOrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        
+
         modelBuilder.Entity<Organization>().HasData(
             new Organization
             {
@@ -256,11 +264,11 @@ public class AppDbContext : DbContext
                 entry.Property("UpdatedAt").CurrentValue = DateTime.UtcNow;
             }
 
-            if (entry.State == EntityState.Added && 
+            if (entry.State == EntityState.Added &&
                 entry.Entity.GetType().GetProperty("CreatedAt") != null)
             {
                 entry.Property("CreatedAt").CurrentValue = DateTime.UtcNow;
             }
         }
     }
-} 
+}

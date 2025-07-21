@@ -482,13 +482,267 @@ public class AuthServiceTests : BaseUnitTest
     }
 
     [Fact]
-    public async Task RefreshTokenAsync_ShouldReturnNotImplemented()
+    public async Task RefreshTokenAsync_WithEmptyToken_ShouldReturnFailure()
     {
         // Act
-        var result = await _authService.RefreshTokenAsync("refresh_token");
+        var result = await _authService.RefreshTokenAsync("");
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Refresh token functionality not yet implemented", result.Message);
+        Assert.Equal("Refresh token is required", result.Message);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithInvalidToken_ShouldReturnFailure()
+    {
+        // Arrange
+        var invalidToken = "invalid_refresh_token";
+
+        _mockUserRepository
+            .Setup(x => x.GetRefreshTokenAsync(invalidToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RefreshToken?)null);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(invalidToken);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Invalid refresh token", result.Message);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithValidToken_ShouldReturnNewTokens()
+    {
+        // Arrange
+        var refreshToken = "valid_refresh_token";
+        var userId = Guid.NewGuid();
+        var organizationId = Guid.NewGuid();
+
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            FirstName = "John",
+            LastName = "Doe",
+            IsActive = true,
+            IsEmailVerified = true
+        };
+
+        var storedRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            CreatedAt = DateTime.UtcNow,
+            User = user
+        };
+
+        var membership = new UserOrganization
+        {
+            UserId = userId,
+            OrganizationId = organizationId,
+            Role = UserRole.OrganizationUser,
+            IsActive = true
+        };
+
+        var newAccessToken = "new_access_token";
+        var newRefreshToken = "new_refresh_token";
+
+        _mockUserRepository
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storedRefreshToken);
+
+        _mockUserOrganizationRepository
+            .Setup(x => x.GetUserOrganizationsAsync(userId))
+            .ReturnsAsync(new List<UserOrganization> { membership });
+
+        _mockJwtService
+            .Setup(x => x.GenerateAccessToken(user, organizationId, membership.Role.ToString()))
+            .Returns(newAccessToken);
+
+        _mockJwtService
+            .Setup(x => x.GenerateRefreshToken(user))
+            .Returns(newRefreshToken);
+
+        _mockUserRepository
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockUserRepository
+            .Setup(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockUserRepository
+            .Setup(x => x.UpdateAsync(user, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(newAccessToken, result.AccessToken);
+        Assert.Equal(newRefreshToken, result.RefreshToken);
+        Assert.NotNull(result.User);
+        Assert.Equal(userId, result.User.UserId);
+        Assert.Equal(organizationId, result.User.OrganizationId);
+        Assert.Equal(membership.Role.ToString(), result.User.Role);
+
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithExpiredToken_ShouldReturnFailure()
+    {
+        // Arrange
+        var refreshToken = "expired_refresh_token";
+        var userId = Guid.NewGuid();
+
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            IsActive = true
+        };
+
+        var storedRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(-1), // Expired
+            CreatedAt = DateTime.UtcNow.AddDays(-2),
+            User = user
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storedRefreshToken);
+
+        _mockUserRepository
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Refresh token has expired", result.Message);
+
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithRevokedToken_ShouldReturnFailure()
+    {
+        // Arrange
+        var refreshToken = "revoked_refresh_token";
+        var userId = Guid.NewGuid();
+
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            IsActive = true
+        };
+
+        var storedRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            CreatedAt = DateTime.UtcNow,
+            RevokedAt = DateTime.UtcNow, // Revoked
+            User = user
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storedRefreshToken);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Refresh token has been revoked", result.Message);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithInactiveUser_ShouldReturnFailure()
+    {
+        // Arrange
+        var refreshToken = "valid_refresh_token";
+        var userId = Guid.NewGuid();
+
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            IsActive = false // Inactive user
+        };
+
+        var storedRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            CreatedAt = DateTime.UtcNow,
+            User = user
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storedRefreshToken);
+
+        _mockUserRepository
+            .Setup(x => x.RevokeAllUserRefreshTokensAsync(userId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("User account is deactivated", result.Message);
+
+        _mockUserRepository.Verify(x => x.RevokeAllUserRefreshTokensAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeRefreshTokenAsync_WithValidToken_ShouldReturnSuccess()
+    {
+        // Arrange
+        var refreshToken = "valid_refresh_token";
+
+        _mockUserRepository
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RevokeRefreshTokenAsync(refreshToken);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Refresh token revoked successfully", result.Message);
+
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeRefreshTokenAsync_WithEmptyToken_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.RevokeRefreshTokenAsync("");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Refresh token is required", result.Message);
     }
 }

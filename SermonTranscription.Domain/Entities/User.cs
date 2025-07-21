@@ -7,44 +7,45 @@ namespace SermonTranscription.Domain.Entities;
 public class User
 {
     public Guid Id { get; set; }
-    
+
     [Required]
     [MaxLength(100)]
     public string FirstName { get; set; } = string.Empty;
-    
+
     [Required]
     [MaxLength(100)]
     public string LastName { get; set; } = string.Empty;
-    
+
     [Required]
     [MaxLength(255)]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
-    
+
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
-    
+
     public bool IsEmailVerified { get; set; }
     public string? EmailVerificationToken { get; set; }
     public DateTime? EmailVerificationTokenExpiry { get; set; }
-    
+
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetTokenExpiry { get; set; }
-    
+
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
-    
+
     public bool IsActive { get; set; } = true;
-    
+
     // Navigation properties
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
     public ICollection<TranscriptionSession> TranscriptionSessions { get; set; } = new List<TranscriptionSession>();
     public ICollection<Transcription> CreatedTranscriptions { get; set; } = new List<Transcription>();
-    
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
     // Computed properties
     public string FullName => $"{FirstName} {LastName}";
-    
+
     // Domain methods
     public void MarkEmailAsVerified()
     {
@@ -53,29 +54,29 @@ public class User
         EmailVerificationTokenExpiry = null;
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     public void UpdateLastLogin()
     {
         LastLoginAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     public bool CanResetPassword()
     {
-        return !string.IsNullOrEmpty(PasswordResetToken) && 
-               PasswordResetTokenExpiry.HasValue && 
+        return !string.IsNullOrEmpty(PasswordResetToken) &&
+               PasswordResetTokenExpiry.HasValue &&
                PasswordResetTokenExpiry.Value > DateTime.UtcNow;
     }
-    
+
     public void ClearPasswordResetToken()
     {
         PasswordResetToken = null;
         PasswordResetTokenExpiry = null;
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     // Organization-related helper methods
-    
+
     /// <summary>
     /// Get user's membership in a specific organization
     /// </summary>
@@ -83,7 +84,7 @@ public class User
     {
         return UserOrganizations.FirstOrDefault(uo => uo.OrganizationId == organizationId && uo.IsActive);
     }
-    
+
     /// <summary>
     /// Get all organizations where the user is active
     /// </summary>
@@ -93,7 +94,7 @@ public class User
             .Where(uo => uo.IsActive)
             .Select(uo => uo.Organization);
     }
-    
+
     /// <summary>
     /// Check if user is an admin in a specific organization
     /// </summary>
@@ -102,7 +103,7 @@ public class User
         var membership = GetOrganizationMembership(organizationId);
         return membership?.IsAdmin() ?? false;
     }
-    
+
     /// <summary>
     /// Check if user can manage users in a specific organization
     /// </summary>
@@ -111,7 +112,7 @@ public class User
         var membership = GetOrganizationMembership(organizationId);
         return membership?.CanManageUsers() ?? false;
     }
-    
+
     /// <summary>
     /// Check if user can manage transcriptions in a specific organization
     /// </summary>
@@ -120,7 +121,7 @@ public class User
         var membership = GetOrganizationMembership(organizationId);
         return membership?.CanManageTranscriptions() ?? false;
     }
-    
+
     /// <summary>
     /// Check if user can view transcriptions in a specific organization
     /// </summary>
@@ -129,7 +130,7 @@ public class User
         var membership = GetOrganizationMembership(organizationId);
         return IsActive && (membership?.CanViewTranscriptions() ?? false);
     }
-    
+
     /// <summary>
     /// Check if user can export transcriptions from a specific organization
     /// </summary>
@@ -138,7 +139,7 @@ public class User
         var membership = GetOrganizationMembership(organizationId);
         return membership?.CanExportTranscriptions() ?? false;
     }
-    
+
     /// <summary>
     /// Update user's role in a specific organization
     /// </summary>
@@ -151,7 +152,7 @@ public class User
             UpdatedAt = DateTime.UtcNow;
         }
     }
-    
+
     /// <summary>
     /// Join an organization with a specific role
     /// </summary>
@@ -181,7 +182,7 @@ public class User
         }
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     /// <summary>
     /// Leave an organization (deactivate membership)
     /// </summary>
@@ -194,39 +195,39 @@ public class User
             UpdatedAt = DateTime.UtcNow;
         }
     }
-    
+
     public void Deactivate()
     {
         IsActive = false;
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     public void Activate()
     {
         IsActive = true;
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     public bool IsEmailVerificationExpired()
     {
-        return EmailVerificationTokenExpiry.HasValue && 
+        return EmailVerificationTokenExpiry.HasValue &&
                EmailVerificationTokenExpiry.Value < DateTime.UtcNow;
     }
-    
+
     public void GenerateEmailVerificationToken()
     {
         EmailVerificationToken = Guid.NewGuid().ToString();
         EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     public void GeneratePasswordResetToken()
     {
         PasswordResetToken = Guid.NewGuid().ToString();
         PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
         UpdatedAt = DateTime.UtcNow;
     }
-    
+
     // Validation methods
     public void ValidateCanManageUsers(Guid organizationId)
     {
@@ -235,7 +236,7 @@ public class User
             throw new UserPermissionException($"User {Email} does not have permission to manage users in organization {organizationId}.");
         }
     }
-    
+
     public void ValidateCanManageTranscriptions(Guid organizationId)
     {
         if (!CanManageTranscriptions(organizationId))
@@ -243,7 +244,7 @@ public class User
             throw new UserPermissionException($"User {Email} does not have permission to manage transcriptions in organization {organizationId}.");
         }
     }
-    
+
     public void ValidateCanViewTranscriptions(Guid organizationId)
     {
         if (!CanViewTranscriptions(organizationId))
@@ -251,7 +252,7 @@ public class User
             throw new UserPermissionException($"User {Email} does not have permission to view transcriptions in organization {organizationId}.");
         }
     }
-    
+
     public void ValidateCanExportTranscriptions(Guid organizationId)
     {
         if (!CanExportTranscriptions(organizationId))
@@ -259,7 +260,7 @@ public class User
             throw new UserPermissionException($"User {Email} does not have permission to export transcriptions in organization {organizationId}.");
         }
     }
-    
+
     public void ValidateIsMemberOfOrganization(Guid organizationId)
     {
         var membership = GetOrganizationMembership(organizationId);
@@ -268,7 +269,7 @@ public class User
             throw new UserPermissionException($"User {Email} is not a member of organization {organizationId}.");
         }
     }
-    
+
     public void ValidateIsActiveInOrganization(Guid organizationId)
     {
         var membership = GetOrganizationMembership(organizationId);
@@ -277,7 +278,7 @@ public class User
             throw new UserPermissionException($"User {Email} is not active in organization {organizationId}.");
         }
     }
-    
+
     public void ValidateEmailVerification()
     {
         if (!IsEmailVerified)
@@ -285,7 +286,7 @@ public class User
             throw new UserEmailVerificationException($"User {Email} email is not verified.");
         }
     }
-    
+
     public void ValidateIsActive()
     {
         if (!IsActive)
@@ -293,7 +294,7 @@ public class User
             throw new UserAuthenticationException($"User {Email} account is not active.");
         }
     }
-    
+
     public void ValidatePasswordResetToken()
     {
         if (!CanResetPassword())
@@ -301,4 +302,4 @@ public class User
             throw new UserPasswordResetException($"Password reset token for user {Email} is invalid or expired.");
         }
     }
-} 
+}
