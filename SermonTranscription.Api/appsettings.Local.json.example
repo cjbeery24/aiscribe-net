@@ -14,6 +14,7 @@
   },
 
   "JwtSettings": {
+    "SecretKey": "your-super-secret-jwt-key-for-development-only-minimum-32-characters-long",
     "ExpirationInMinutes": 120,
     "RefreshTokenExpirationInDays": 30
   },

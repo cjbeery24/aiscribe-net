@@ -111,8 +111,8 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 2.4 Implement multi-tenant middleware for organization data isolation
   - [x] 2.5 Create user registration, login, and password reset endpoints
   - [x] 2.6 Add user invitation system with email activation workflow
-  - [ ] 2.7 Implement refresh token mechanism for secure token rotation
-  - [ ] 2.8 Add authentication middleware and secure API endpoints
+  - [x] 2.7 Implement refresh token mechanism for secure token rotation
+  - [x] 2.8 Add authentication middleware and secure API endpoints
 - [ ] 3.0 Core API Development (Organizations, Users, Subscriptions)
   - [ ] 3.1 Create organization management endpoints (CRUD operations)
   - [ ] 3.2 Implement user profile management and organization user endpoints

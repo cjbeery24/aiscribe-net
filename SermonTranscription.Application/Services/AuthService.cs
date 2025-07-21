@@ -281,6 +281,24 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<AuthResult> RevokeAllUserRefreshTokensAsync(Guid userId)
+    {
+        try
+        {
+            // Revoke all refresh tokens for the user
+            await _userRepository.RevokeAllUserRefreshTokensAsync(userId);
+
+            _logger.LogInformation("All refresh tokens revoked for user: {UserId}", userId);
+
+            return AuthResult.Success("All refresh tokens revoked successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking all refresh tokens for user {UserId}", userId);
+            return AuthResult.Failure("An error occurred while revoking refresh tokens");
+        }
+    }
+
     private async Task<string> IssueRefreshTokenAsync(User user)
     {
         var refreshToken = _jwtService.GenerateRefreshToken(user);
@@ -458,6 +476,7 @@ public interface IAuthService
     Task<AuthResult> RegisterAsync(RegisterRequest request);
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
     Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken);
+    Task<AuthResult> RevokeAllUserRefreshTokensAsync(Guid userId);
     Task<AuthResult> ValidateTokenAsync(string token);
     Task<AuthResult> ForgotPasswordAsync(string email);
     Task<AuthResult> ResetPasswordAsync(string token, string newPassword);

@@ -203,20 +203,47 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Logout endpoint (client-side token invalidation)
+    /// Logout endpoint - revokes all refresh tokens for the current user
     /// </summary>
     /// <returns>Logout confirmation</returns>
     [HttpPost("logout")]
     [Authorize]
     [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
-    public IActionResult Logout()
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Logout()
     {
-        // In a real implementation, you might want to blacklist the token
-        // For now, we'll just return a success response
-        return Ok(new LogoutResponse
+        try
         {
-            Message = "Successfully logged out"
-        });
+            var userIdClaim = User.FindFirst("userId")?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new ErrorResponse
+                {
+                    Message = "Invalid authentication token",
+                    Errors = ["Missing or invalid user information"]
+                });
+            }
+
+            // Revoke all refresh tokens for the current user
+            await _authService.RevokeAllUserRefreshTokensAsync(userId);
+
+            _logger.LogInformation("User {UserId} logged out and all refresh tokens revoked", userId);
+
+            return Ok(new LogoutResponse
+            {
+                Message = "Successfully logged out and all sessions terminated"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout");
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred during logout",
+                Errors = ["Internal server error"]
+            });
+        }
     }
 
     /// <summary>
@@ -395,4 +422,6 @@ public class AuthController : ControllerBase
             });
         }
     }
+
+
 }
