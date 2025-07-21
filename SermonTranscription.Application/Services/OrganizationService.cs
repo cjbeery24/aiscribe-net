@@ -1,0 +1,506 @@
+using Microsoft.Extensions.Logging;
+using SermonTranscription.Application.DTOs;
+using SermonTranscription.Application.Common;
+using SermonTranscription.Application.Interfaces;
+using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Exceptions;
+
+namespace SermonTranscription.Application.Services;
+
+
+
+public class OrganizationService : IOrganizationService
+{
+    private readonly IOrganizationRepository _organizationRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ILogger<OrganizationService> _logger;
+
+    public OrganizationService(
+        IOrganizationRepository organizationRepository,
+        IUserRepository userRepository,
+        ILogger<OrganizationService> logger)
+    {
+        _organizationRepository = organizationRepository;
+        _userRepository = userRepository;
+        _logger = logger;
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(CreateOrganizationRequest request, Guid createdByUserId)
+    {
+        try
+        {
+            // Validate the creating user exists and is active
+            var creatingUser = await _userRepository.GetByIdAsync(createdByUserId);
+            if (creatingUser == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Creating user not found");
+            }
+
+            if (!creatingUser.IsActive)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Creating user is not active");
+            }
+
+            // Check if organization name already exists
+            var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name);
+            if (existingOrganizations.Any(o => o.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                return ServiceResult<OrganizationResponse>.Failure($"An organization with the name '{request.Name}' already exists");
+            }
+
+            // Create new organization
+            var organization = new Organization
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                Description = request.Description,
+                ContactEmail = request.ContactEmail,
+                PhoneNumber = request.PhoneNumber,
+                Address = request.Address,
+                City = request.City,
+                State = request.State,
+                PostalCode = request.PostalCode,
+                Country = request.Country,
+                WebsiteUrl = request.WebsiteUrl,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            // Generate slug
+            organization.UpdateSlug();
+
+            // Save organization
+            await _organizationRepository.AddAsync(organization);
+
+            _logger.LogInformation("Organization created: {OrganizationId} by user {UserId}", organization.Id, createdByUserId);
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating organization");
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while creating the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving organization {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationBySlugAsync(string slug)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetBySlugAsync(slug);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving organization by slug {Slug}", slug);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationListResponse>> GetOrganizationsAsync(OrganizationSearchRequest request)
+    {
+        try
+        {
+            // Validate pagination parameters
+            if (request.PageNumber < 1) request.PageNumber = 1;
+            if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 10;
+
+            // Get organizations based on search criteria
+            var organizations = await _organizationRepository.GetAllAsync();
+
+            // Apply filters
+            var filteredOrganizations = organizations.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+            {
+                filteredOrganizations = filteredOrganizations.Where(o =>
+                    o.Name.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (o.Description != null && o.Description.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (request.IsActive.HasValue)
+            {
+                filteredOrganizations = filteredOrganizations.Where(o => o.IsActive == request.IsActive.Value);
+            }
+
+            if (request.HasActiveSubscription.HasValue)
+            {
+                filteredOrganizations = filteredOrganizations.Where(o => o.HasActiveSubscription() == request.HasActiveSubscription.Value);
+            }
+
+            // Apply sorting
+            filteredOrganizations = request.SortBy?.ToLower() switch
+            {
+                "name" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.Name) : filteredOrganizations.OrderBy(o => o.Name),
+                "createdat" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.CreatedAt) : filteredOrganizations.OrderBy(o => o.CreatedAt),
+                "activeusercount" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.GetActiveUserCount()) : filteredOrganizations.OrderBy(o => o.GetActiveUserCount()),
+                _ => filteredOrganizations.OrderBy(o => o.Name)
+            };
+
+            // Apply pagination
+            var totalCount = filteredOrganizations.Count();
+            var totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize);
+
+            var pagedOrganizations = filteredOrganizations
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var response = new OrganizationListResponse
+            {
+                Organizations = pagedOrganizations.Select(MapToOrganizationSummaryDto).ToList(),
+                TotalCount = totalCount,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalPages = totalPages,
+                HasNextPage = request.PageNumber < totalPages,
+                HasPreviousPage = request.PageNumber > 1
+            };
+
+            return ServiceResult<OrganizationListResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving organizations");
+            return ServiceResult<OrganizationListResponse>.Failure("An error occurred while retrieving organizations");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            // Update fields if provided
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                // Check if new name conflicts with existing organization
+                var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name);
+                var conflictingOrg = existingOrganizations.FirstOrDefault(o =>
+                    o.Id != organizationId &&
+                    o.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (conflictingOrg != null)
+                {
+                    return ServiceResult<OrganizationResponse>.Failure($"An organization with the name '{request.Name}' already exists");
+                }
+
+                organization.Name = request.Name;
+                organization.UpdateSlug();
+            }
+
+            if (request.Description != null)
+                organization.Description = request.Description;
+
+            if (request.ContactEmail != null)
+                organization.ContactEmail = request.ContactEmail;
+
+            if (request.PhoneNumber != null)
+                organization.PhoneNumber = request.PhoneNumber;
+
+            if (request.Address != null)
+                organization.Address = request.Address;
+
+            if (request.City != null)
+                organization.City = request.City;
+
+            if (request.State != null)
+                organization.State = request.State;
+
+            if (request.PostalCode != null)
+                organization.PostalCode = request.PostalCode;
+
+            if (request.Country != null)
+                organization.Country = request.Country;
+
+            if (request.WebsiteUrl != null)
+                organization.WebsiteUrl = request.WebsiteUrl;
+
+            if (request.IsActive.HasValue)
+            {
+                if (request.IsActive.Value)
+                    organization.Activate();
+                else
+                    organization.Deactivate();
+            }
+
+            organization.UpdatedAt = DateTime.UtcNow;
+
+            await _organizationRepository.UpdateAsync(organization);
+
+            _logger.LogInformation("Organization updated: {OrganizationId}", organizationId);
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating organization {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while updating the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            // Update settings if provided
+            if (request.MaxUsers.HasValue)
+                organization.MaxUsers = request.MaxUsers.Value;
+
+            if (request.MaxTranscriptionHours.HasValue)
+                organization.MaxTranscriptionHours = request.MaxTranscriptionHours.Value;
+
+            if (request.CanExportTranscriptions.HasValue)
+                organization.CanExportTranscriptions = request.CanExportTranscriptions.Value;
+
+            if (request.HasRealtimeTranscription.HasValue)
+                organization.HasRealtimeTranscription = request.HasRealtimeTranscription.Value;
+
+            organization.UpdatedAt = DateTime.UtcNow;
+
+            await _organizationRepository.UpdateAsync(organization);
+
+            _logger.LogInformation("Organization settings updated: {OrganizationId}", organizationId);
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating organization settings {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while updating organization settings");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            organization.UpdateLogo(request.LogoUrl);
+            await _organizationRepository.UpdateAsync(organization);
+
+            _logger.LogInformation("Organization logo updated: {OrganizationId}", organizationId);
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating organization logo {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while updating the organization logo");
+        }
+    }
+
+    public async Task<ServiceResult> DeleteOrganizationAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult.Failure("Organization not found");
+            }
+
+            // Check if organization has active users
+            if (organization.GetActiveUserCount() > 0)
+            {
+                return ServiceResult.Failure("Cannot delete organization with active users. Please remove all users first.");
+            }
+
+            await _organizationRepository.DeleteAsync(organizationId);
+
+            _logger.LogInformation("Organization deleted: {OrganizationId}", organizationId);
+            return ServiceResult.Success("Organization deleted successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting organization {OrganizationId}", organizationId);
+            return ServiceResult.Failure("An error occurred while deleting the organization");
+        }
+    }
+
+    public async Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult.Failure("Organization not found");
+            }
+
+            organization.Activate();
+            await _organizationRepository.UpdateAsync(organization);
+
+            _logger.LogInformation("Organization activated: {OrganizationId}", organizationId);
+            return ServiceResult.Success("Organization activated successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error activating organization {OrganizationId}", organizationId);
+            return ServiceResult.Failure("An error occurred while activating the organization");
+        }
+    }
+
+    public async Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult.Failure("Organization not found");
+            }
+
+            organization.Deactivate();
+            await _organizationRepository.UpdateAsync(organization);
+
+            _logger.LogInformation("Organization deactivated: {OrganizationId}", organizationId);
+            return ServiceResult.Success("Organization deactivated successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deactivating organization {OrganizationId}", organizationId);
+            return ServiceResult.Failure("An error occurred while deactivating the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationWithUsersAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetWithUserOrganizationsAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving organization with users {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+        }
+    }
+
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId)
+    {
+        try
+        {
+            var organization = await _organizationRepository.GetWithSubscriptionsAsync(organizationId);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+            }
+
+            var response = MapToOrganizationResponse(organization);
+            return ServiceResult<OrganizationResponse>.Success(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving organization with subscriptions {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+        }
+    }
+
+    private static OrganizationResponse MapToOrganizationResponse(Organization organization)
+    {
+        return new OrganizationResponse
+        {
+            Id = organization.Id,
+            Name = organization.Name,
+            Slug = organization.Slug,
+            Description = organization.Description,
+            ContactEmail = organization.ContactEmail,
+            PhoneNumber = organization.PhoneNumber,
+            Address = organization.Address,
+            City = organization.City,
+            State = organization.State,
+            PostalCode = organization.PostalCode,
+            Country = organization.Country,
+            LogoUrl = organization.LogoUrl,
+            WebsiteUrl = organization.WebsiteUrl,
+            CreatedAt = organization.CreatedAt,
+            UpdatedAt = organization.UpdatedAt,
+            IsActive = organization.IsActive,
+            MaxUsers = organization.MaxUsers,
+            MaxTranscriptionHours = organization.MaxTranscriptionHours,
+            CanExportTranscriptions = organization.CanExportTranscriptions,
+            HasRealtimeTranscription = organization.HasRealtimeTranscription,
+            DisplayName = organization.DisplayName,
+            FullAddress = organization.GetFullAddress(),
+            HasCompleteContactInfo = organization.HasCompleteContactInfo(),
+            HasActiveSubscription = organization.HasActiveSubscription(),
+            ActiveUserCount = organization.GetActiveUserCount(),
+            CanAddMoreUsers = organization.CanAddMoreUsers(),
+            CanCreateTranscription = organization.CanCreateTranscription(),
+            HasRealtimeTranscriptionEnabled = organization.HasRealtimeTranscriptionEnabled(),
+            CanExportTranscriptionsEnabled = organization.CanExportTranscriptionsEnabled()
+        };
+    }
+
+    private static OrganizationSummaryDto MapToOrganizationSummaryDto(Organization organization)
+    {
+        return new OrganizationSummaryDto
+        {
+            Id = organization.Id,
+            Name = organization.Name,
+            Slug = organization.Slug,
+            Description = organization.Description,
+            LogoUrl = organization.LogoUrl,
+            CreatedAt = organization.CreatedAt,
+            IsActive = organization.IsActive,
+            ActiveUserCount = organization.GetActiveUserCount(),
+            MaxUsers = organization.MaxUsers,
+            HasActiveSubscription = organization.HasActiveSubscription()
+        };
+    }
+}

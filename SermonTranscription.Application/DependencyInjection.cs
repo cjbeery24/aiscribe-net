@@ -2,6 +2,7 @@ using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SermonTranscription.Application.Services;
+using SermonTranscription.Application.Interfaces;
 
 namespace SermonTranscription.Application;
 
@@ -17,6 +18,8 @@ public static class DependencyInjection
 
         // Service registrations
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddScoped<IUserService, UserService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IPasswordValidator, PasswordValidator>();

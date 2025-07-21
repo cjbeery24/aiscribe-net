@@ -114,8 +114,8 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 2.7 Implement refresh token mechanism for secure token rotation
   - [x] 2.8 Add authentication middleware and secure API endpoints
 - [ ] 3.0 Core API Development (Organizations, Users, Subscriptions)
-  - [ ] 3.1 Create organization management endpoints (CRUD operations)
-  - [ ] 3.2 Implement user profile management and organization user endpoints
+  - [x] 3.1 Create organization management endpoints (CRUD operations)
+  - [x] 3.2 Implement user profile management and organization user endpoints
   - [ ] 3.3 Build subscription plan management with tier-based feature access
   - [ ] 3.4 Add organization dashboard data aggregation endpoints
   - [ ] 3.5 Implement input validation, error handling, and consistent API responses
