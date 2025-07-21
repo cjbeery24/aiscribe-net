@@ -109,7 +109,7 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 2.2 Create JWT authentication service with token generation and validation
   - [x] 2.3 Set up role-based authorization with Organization Admin/User roles
   - [x] 2.4 Implement multi-tenant middleware for organization data isolation
-  - [ ] 2.5 Create user registration, login, and password reset endpoints
+  - [x] 2.5 Create user registration, login, and password reset endpoints
   - [ ] 2.6 Add user invitation system with email activation workflow
   - [ ] 2.7 Implement refresh token mechanism for secure token rotation
   - [ ] 2.8 Add authentication middleware and secure API endpoints

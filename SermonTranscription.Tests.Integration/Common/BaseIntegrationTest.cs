@@ -1,22 +1,25 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SermonTranscription.Api;
 using SermonTranscription.Infrastructure.Data;
+using Microsoft.Data.Sqlite;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace SermonTranscription.Tests.Integration.Common;
 
 /// <summary>
 /// Base class for integration tests providing ASP.NET Core test server
 /// </summary>
-public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.TestWebApplicationFactory>
+public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.TestWebApplicationFactory>, IAsyncLifetime
 {
     protected readonly TestWebApplicationFactory Factory;
     protected readonly HttpClient HttpClient;
@@ -29,31 +32,67 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
         DbContext = factory.Services.GetRequiredService<AppDbContext>();
     }
 
+    public Task InitializeAsync()
+    {
+        try
+        {
+            DbContext.Database.OpenConnection();
+            DbContext.Database.EnsureCreated(); // Use EnsureCreated for schema validation
+            Console.WriteLine("Migrations applied successfully.");
+
+            // Debug: List all tables in the database
+            var tables = DbContext.Database.SqlQueryRaw<string>("SELECT name FROM sqlite_master WHERE type='table'").ToList();
+            Console.WriteLine("Tables in database: " + string.Join(", ", tables));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Migration failed: {ex.Message}\n{ex.StackTrace}");
+            throw;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync()
+    {
+        DbContext.Database.EnsureDeleted(); // Clean up database
+        DbContext.Database.CloseConnection();
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Custom WebApplicationFactory for integration tests
     /// </summary>
     public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly SqliteConnection _connection;
+
+        public TestWebApplicationFactory()
+        {
+            _connection = new SqliteConnection("DataSource=:memory:");
+            _connection.Open(); // Keep connection open for in-memory database
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((context, config) =>
             {
                 // Remove any existing configuration sources
                 config.Sources.Clear();
-                
-                // Add test-specific configuration
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:DefaultConnection"] = "Data Source=:memory:",
-                    ["JwtSettings:SecretKey"] = "test-secret-key-for-integration-tests-must-be-long-enough",
-                    ["JwtSettings:Issuer"] = "TestIssuer",
-                    ["JwtSettings:Audience"] = "TestAudience",
-                    ["ASPNETCORE_ENVIRONMENT"] = "Test"
-                });
+                // Optionally load appsettings.Test.json
+                config.AddJsonFile("appsettings.Test.json", optional: true);
             });
 
             builder.ConfigureServices(services =>
             {
+                // Remove existing DbContext registration
+                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+                if (descriptor != null)
+                    services.Remove(descriptor);
+
+                // Register AppDbContext with SQLite in-memory
+                services.AddDbContext<AppDbContext>(options =>
+                    options.UseSqlite(_connection));
+
                 // Reduce logging noise in tests
                 services.AddLogging(logging =>
                 {
@@ -63,7 +102,14 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
                 });
             });
 
-            builder.UseEnvironment("Testing");
+            builder.UseEnvironment("Test");
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            _connection?.Close();
+            _connection?.Dispose();
         }
     }
 
@@ -72,11 +118,15 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
     /// </summary>
     protected async Task ClearDatabaseAsync()
     {
-        // For in-memory database, we need to clear all entities manually
+        // For in-memory database, clear all entities manually
         DbContext.UserOrganizations.RemoveRange(DbContext.UserOrganizations);
         DbContext.Users.RemoveRange(DbContext.Users);
         DbContext.Organizations.RemoveRange(DbContext.Organizations);
-        
+        DbContext.Subscriptions.RemoveRange(DbContext.Subscriptions);
+        DbContext.TranscriptionSessions.RemoveRange(DbContext.TranscriptionSessions);
+        DbContext.Transcriptions.RemoveRange(DbContext.Transcriptions);
+        DbContext.TranscriptionSegments.RemoveRange(DbContext.TranscriptionSegments);
+
         await DbContext.SaveChangesAsync();
     }
 
@@ -129,50 +179,58 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
         string lastName = "User",
         string role = "OrganizationUser")
     {
-        var organization = new SermonTranscription.Domain.Entities.Organization
+        try
         {
-            Id = Guid.NewGuid(),
-            Name = "Test Organization",
-            Slug = "test-org",
-            ContactEmail = "admin@test.com",
-            CreatedAt = DateTime.UtcNow,
-            IsActive = true,
-            MaxUsers = 10,
-            MaxTranscriptionHours = 100,
-            CanExportTranscriptions = true,
-            HasRealtimeTranscription = true
-        };
+            var organization = new SermonTranscription.Domain.Entities.Organization
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Organization",
+                Slug = "test-org",
+                ContactEmail = "admin@test.com",
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true,
+                MaxUsers = 10,
+                MaxTranscriptionHours = 100,
+                CanExportTranscriptions = true,
+                HasRealtimeTranscription = true
+            };
 
-        var user = new SermonTranscription.Domain.Entities.User
+            var user = new SermonTranscription.Domain.Entities.User
+            {
+                Id = Guid.NewGuid(),
+                FirstName = firstName,
+                LastName = lastName,
+                Email = email,
+                PasswordHash = "$2a$11$test.hash.for.integration.tests", // BCrypt hash
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            // Create UserOrganization join entity
+            var userOrganization = new SermonTranscription.Domain.Entities.UserOrganization
+            {
+                UserId = user.Id,
+                OrganizationId = organization.Id,
+                Role = SermonTranscription.Domain.Enums.UserRole.OrganizationUser,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                User = user,
+                Organization = organization
+            };
+
+            DbContext.Organizations.Add(organization);
+            DbContext.Users.Add(user);
+            DbContext.UserOrganizations.Add(userOrganization);
+            await DbContext.SaveChangesAsync();
+
+            return user;
+        }
+        catch (Exception ex)
         {
-            Id = Guid.NewGuid(),
-            FirstName = firstName,
-            LastName = lastName,
-            Email = email,
-            PasswordHash = "$2a$11$test.hash.for.integration.tests", // BCrypt hash
-            IsEmailVerified = true,
-            CreatedAt = DateTime.UtcNow,
-            IsActive = true
-        };
-
-        // Create UserOrganization join entity
-        var userOrganization = new SermonTranscription.Domain.Entities.UserOrganization
-        {
-            UserId = user.Id,
-            OrganizationId = organization.Id,
-            Role = SermonTranscription.Domain.Enums.UserRole.OrganizationUser,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            User = user,
-            Organization = organization
-        };
-
-        DbContext.Organizations.Add(organization);
-        DbContext.Users.Add(user);
-        DbContext.UserOrganizations.Add(userOrganization);
-        await DbContext.SaveChangesAsync();
-
-        return user;
+            Console.WriteLine($"CreateTestUserAsync failed: {ex.Message}\n{ex.StackTrace}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -209,11 +267,11 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
     /// <summary>
     /// Assert that the response is successful (2xx status code)
     /// </summary>
-    protected static void AssertSuccessStatusCode(HttpResponseMessage response)
+    protected static async Task AssertSuccessStatusCodeAsync(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
         {
-            var content = response.Content.ReadAsStringAsync().Result;
+            var content = await response.Content.ReadAsStringAsync();
             throw new HttpRequestException(
                 $"Expected successful status code but got {response.StatusCode}. Content: {content}");
         }
@@ -226,4 +284,4 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
     {
         return Factory.Services.GetRequiredService<AppDbContext>();
     }
-} 
+}

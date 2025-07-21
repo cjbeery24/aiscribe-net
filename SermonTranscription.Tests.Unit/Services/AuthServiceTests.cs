@@ -1,0 +1,446 @@
+using Microsoft.Extensions.Logging;
+using Moq;
+using SermonTranscription.Application.Services;
+using SermonTranscription.Application.DTOs;
+using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
+using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Tests.Unit.Common;
+using System.Security.Cryptography;
+using Xunit;
+
+namespace SermonTranscription.Tests.Unit.Services;
+
+public class AuthServiceTests : BaseUnitTest
+{
+    private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<IUserOrganizationRepository> _mockUserOrganizationRepository;
+    private readonly Mock<IJwtService> _mockJwtService;
+    private readonly Mock<ILogger<AuthService>> _mockLogger;
+    private readonly AuthService _authService;
+
+    public AuthServiceTests()
+    {
+        _mockUserRepository = new Mock<IUserRepository>();
+        _mockUserOrganizationRepository = new Mock<IUserOrganizationRepository>();
+        _mockJwtService = new Mock<IJwtService>();
+        _mockLogger = new Mock<ILogger<AuthService>>();
+
+        _authService = new AuthService(
+            _mockUserRepository.Object,
+            _mockUserOrganizationRepository.Object,
+            _mockJwtService.Object,
+            _mockLogger.Object);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithValidRequest_ShouldReturnSuccess()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "test@example.com",
+            Password = "password123",
+            FirstName = "John",
+            LastName = "Doe"
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        _mockUserRepository
+            .Setup(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User user, CancellationToken token) => user);
+
+        // Act
+        var result = await _authService.RegisterAsync(request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("User registered successfully. Please check your email to verify your account.", result.Message);
+        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithExistingEmail_ShouldReturnFailure()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "existing@example.com",
+            Password = "password123",
+            FirstName = "John",
+            LastName = "Doe"
+        };
+
+        var existingUser = new User { Email = request.Email };
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingUser);
+
+        // Act
+        var result = await _authService.RegisterAsync(request);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("User with this email already exists", result.Message);
+        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithValidCredentials_ShouldReturnSuccess()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var password = "password123";
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            PasswordHash = hashedPassword,
+            IsActive = true,
+            IsEmailVerified = true
+        };
+
+        var userOrg = new UserOrganization
+        {
+            UserId = user.Id,
+            OrganizationId = Guid.NewGuid(),
+            Role = UserRole.OrganizationAdmin,
+            IsActive = true
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockUserOrganizationRepository
+            .Setup(x => x.GetUserOrganizationsAsync(user.Id))
+            .ReturnsAsync(new List<UserOrganization> { userOrg });
+
+        _mockJwtService
+            .Setup(x => x.GenerateAccessToken(user, userOrg.OrganizationId, userOrg.Role.ToString()))
+            .Returns("access_token");
+
+        _mockJwtService
+            .Setup(x => x.GenerateRefreshToken(user))
+            .Returns("refresh_token");
+
+        // Act
+        var result = await _authService.LoginAsync(email, password);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Login successful", result.Message);
+        Assert.NotNull(result.AccessToken);
+        Assert.NotNull(result.RefreshToken);
+        Assert.Equal("access_token", result.AccessToken);
+        Assert.Equal("refresh_token", result.RefreshToken);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithInvalidEmail_ShouldReturnFailure()
+    {
+        // Arrange
+        var email = "nonexistent@example.com";
+        var password = "password123";
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.LoginAsync(email, password);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Invalid email or password", result.Message);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithWrongPassword_ShouldReturnFailure()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var correctPassword = "correctpassword123";
+        var wrongPassword = "wrongpassword123";
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(correctPassword);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            PasswordHash = hashedPassword,
+            IsActive = true,
+            IsEmailVerified = true
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.LoginAsync(email, wrongPassword);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Invalid email or password", result.Message);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithInactiveUser_ShouldReturnFailure()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var password = "password123";
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            PasswordHash = hashedPassword,
+            IsActive = false
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.LoginAsync(email, password);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Account is deactivated", result.Message);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WithValidEmail_ShouldReturnSuccess()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            IsActive = true
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockUserRepository
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.ForgotPasswordAsync(email);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WithNonExistentEmail_ShouldReturnSuccess()
+    {
+        // Arrange
+        var email = "nonexistent@example.com";
+
+        _mockUserRepository
+            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.ForgotPasswordAsync(email);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithValidToken_ShouldReturnSuccess()
+    {
+        // Arrange
+        var token = "valid_reset_token";
+        var newPassword = "newpassword123";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "test@example.com",
+            PasswordResetToken = token,
+            PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1),
+            IsActive = true
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockUserRepository
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.ResetPasswordAsync(token, newPassword);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Password has been successfully reset", result.Message);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithInvalidToken_ShouldReturnFailure()
+    {
+        // Arrange
+        var token = "invalid_token";
+        var newPassword = "newpassword123";
+
+        _mockUserRepository
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.ResetPasswordAsync(token, newPassword);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Invalid or expired reset token", result.Message);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithExpiredToken_ShouldReturnFailure()
+    {
+        // Arrange
+        var token = "expired_token";
+        var newPassword = "newpassword123";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "test@example.com",
+            PasswordResetToken = token,
+            PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(-1), // Expired
+            IsActive = true
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.ResetPasswordAsync(token, newPassword);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Reset token has expired", result.Message);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithEmptyCredentials_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.LoginAsync("", "password");
+        var result2 = await _authService.LoginAsync("email@test.com", "");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Email and password are required", result.Message);
+        Assert.False(result2.IsSuccess);
+        Assert.Equal("Email and password are required", result2.Message);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithEmptyRequiredFields_ShouldReturnFailure()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "",
+            Password = "password123",
+            FirstName = "John",
+            LastName = "Doe"
+        };
+
+        // Act
+        var result = await _authService.RegisterAsync(request);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Contains("required", result.Message);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithShortPassword_ShouldReturnFailure()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "test@example.com",
+            Password = "123",
+            FirstName = "John",
+            LastName = "Doe"
+        };
+
+        // Act
+        var result = await _authService.RegisterAsync(request);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Password must be at least 8 characters long", result.Message);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WithEmptyEmail_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.ForgotPasswordAsync("");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Email is required", result.Message);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithEmptyToken_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.ResetPasswordAsync("", "newpassword123");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Token and new password are required", result.Message);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithShortPassword_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.ResetPasswordAsync("valid_token", "123");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Password must be at least 8 characters long", result.Message);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_ShouldReturnNotImplemented()
+    {
+        // Act
+        var result = await _authService.RefreshTokenAsync("refresh_token");
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Refresh token functionality not yet implemented", result.Message);
+    }
+}

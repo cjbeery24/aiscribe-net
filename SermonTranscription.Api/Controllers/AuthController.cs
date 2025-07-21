@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Application.Services;
+using SermonTranscription.Application.DTOs;
 
 namespace SermonTranscription.Api.Controllers;
 
@@ -215,65 +216,83 @@ public class AuthController : ControllerBase
             Message = "Successfully logged out"
         });
     }
-}
 
-/// <summary>
-/// Login request model
-/// </summary>
-public class LoginRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
+    /// <summary>
+    /// Request password reset for a user account
+    /// </summary>
+    /// <param name="request">Password reset request</param>
+    /// <returns>Password reset request result</returns>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        try
+        {
+            var result = await _authService.ForgotPasswordAsync(request.Email);
 
-/// <summary>
-/// Login response model
-/// </summary>
-public class LoginResponse
-{
-    public string AccessToken { get; set; } = string.Empty;
-    public string RefreshToken { get; set; } = string.Empty;
-    public AuthUserInfo User { get; set; } = new();
-}
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = result.Message,
+                    Errors = new[] { result.Message }
+                });
+            }
 
-/// <summary>
-/// Register response model
-/// </summary>
-public class RegisterResponse
-{
-    public string Message { get; set; } = string.Empty;
-}
+            return Ok(new ForgotPasswordResponse
+            {
+                Message = result.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during forgot password for email: {Email}", request.Email);
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred while processing your request",
+                Errors = new[] { "Internal server error" }
+            });
+        }
+    }
 
-/// <summary>
-/// Refresh token request model
-/// </summary>
-public class RefreshRequest
-{
-    public string RefreshToken { get; set; } = string.Empty;
-}
+    /// <summary>
+    /// Reset password using a valid reset token
+    /// </summary>
+    /// <param name="request">Password reset request</param>
+    /// <returns>Password reset result</returns>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        try
+        {
+            var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
 
-/// <summary>
-/// Refresh token response model
-/// </summary>
-public class RefreshResponse
-{
-    public string AccessToken { get; set; } = string.Empty;
-    public string RefreshToken { get; set; } = string.Empty;
-}
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = result.Message,
+                    Errors = new[] { result.Message }
+                });
+            }
 
-/// <summary>
-/// Logout response model
-/// </summary>
-public class LogoutResponse
-{
-    public string Message { get; set; } = string.Empty;
+            return Ok(new ResetPasswordResponse
+            {
+                Message = result.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during password reset");
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred while resetting your password",
+                Errors = new[] { "Internal server error" }
+            });
+        }
+    }
 }
-
-/// <summary>
-/// Error response model
-/// </summary>
-public class ErrorResponse
-{
-    public string Message { get; set; } = string.Empty;
-    public string[] Errors { get; set; } = Array.Empty<string>();
-} 

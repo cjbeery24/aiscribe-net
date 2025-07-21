@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
@@ -18,10 +19,10 @@ public static class DependencyInjection
 
         if (environment == "Test" || connectionString?.Contains(":memory:") == true)
         {
-            // Use in-memory database for testing
+            // Use SQLite in-memory database for testing
             services.AddDbContext<Data.AppDbContext>(options =>
             {
-                options.UseInMemoryDatabase("IntegrationTestDb_" + Guid.NewGuid());
+                options.UseSqlite(connectionString);
                 options.EnableSensitiveDataLogging();
             });
         }
@@ -47,7 +48,7 @@ public static class DependencyInjection
         // Repository registrations
         services.AddScoped<IUserRepository, Repositories.UserRepository>();
         // services.AddScoped<IOrganizationRepository, Repositories.OrganizationRepository>();
-        // services.AddScoped<IUserOrganizationRepository, Repositories.UserOrganizationRepository>();
+        services.AddScoped<IUserOrganizationRepository, Repositories.UserOrganizationRepository>();
         // services.AddScoped<ITranscriptionRepository, Repositories.TranscriptionRepository>();
         // services.AddScoped<ITranscriptionSessionRepository, Repositories.TranscriptionSessionRepository>();
         // services.AddScoped<ISubscriptionRepository, Repositories.SubscriptionRepository>();

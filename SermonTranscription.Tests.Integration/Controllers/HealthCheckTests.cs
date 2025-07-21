@@ -22,7 +22,7 @@ public class HealthCheckTests : BaseIntegrationTest
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Be("Healthy");
     }
@@ -48,7 +48,7 @@ public class HealthCheckTests : BaseIntegrationTest
         var response = await HttpClient.GetAsync("/health");
 
         // Assert
-        AssertSuccessStatusCode(response);
+        await AssertSuccessStatusCodeAsync(response);
         response.Content.Headers.ContentType?.ToString().Should().Be("text/plain");
     }
 
@@ -64,11 +64,11 @@ public class HealthCheckTests : BaseIntegrationTest
         // Assert
         response.Should().NotBeNull();
         response.IsSuccessStatusCode.Should().BeTrue();
-        
+
         // Verify we can access the database context
         var dbContext = GetDbContext();
         dbContext.Should().NotBeNull();
-        
+
         // Verify database was created
         var canConnect = await dbContext.Database.CanConnectAsync();
         canConnect.Should().BeTrue();
@@ -104,7 +104,7 @@ public class HealthCheckTests : BaseIntegrationTest
 
         // Act - Test JSON content creation
         var jsonContent = CreateJsonContent(testData);
-        
+
         // Assert
         jsonContent.Should().NotBeNull();
         jsonContent.Headers.ContentType?.MediaType.Should().Be("application/json");
@@ -152,4 +152,4 @@ public class HealthCheckTests : BaseIntegrationTest
         userOrg!.Organization.Should().NotBeNull();
         userOrg.Organization.Name.Should().Be("Test Organization");
     }
-} 
+}

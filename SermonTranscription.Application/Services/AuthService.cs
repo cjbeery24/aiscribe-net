@@ -3,6 +3,8 @@ using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Domain.Exceptions;
+using BCrypt.Net;
+using SermonTranscription.Application.DTOs;
 
 namespace SermonTranscription.Application.Services;
 
@@ -214,18 +216,129 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<AuthResult> ForgotPasswordAsync(string email)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return AuthResult.Failure("Email is required");
+            }
+
+            // Find user by email
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+            {
+                // Don't reveal if user exists or not for security
+                _logger.LogInformation("Password reset requested for email: {Email} (user not found)", email);
+                return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+            }
+
+            // Validate user is active
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Password reset requested for inactive user: {UserId}", user.Id);
+                return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+            }
+
+            // Generate password reset token (valid for 1 hour)
+            var resetToken = GeneratePasswordResetToken();
+            var resetTokenExpiry = DateTime.UtcNow.AddHours(1);
+
+            // Store reset token in user entity (in a real implementation, you might want a separate table)
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpiry = resetTokenExpiry;
+            await _userRepository.UpdateAsync(user);
+
+            // TODO: Send email with reset link
+            // In a real implementation, you would inject an email service and send the reset link
+            _logger.LogInformation("Password reset token generated for user {UserId}: {Token}", user.Id, resetToken);
+
+            return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during forgot password for email: {Email}", email);
+            return AuthResult.Failure("An error occurred while processing your request");
+        }
+    }
+
+    public async Task<AuthResult> ResetPasswordAsync(string token, string newPassword)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword))
+            {
+                return AuthResult.Failure("Token and new password are required");
+            }
+
+            if (newPassword.Length < 8)
+            {
+                return AuthResult.Failure("Password must be at least 8 characters long");
+            }
+
+            // Find user by reset token
+            var user = await _userRepository.GetByPasswordResetTokenAsync(token);
+            if (user == null)
+            {
+                _logger.LogWarning("Password reset attempted with invalid token: {Token}", token);
+                return AuthResult.Failure("Invalid or expired reset token");
+            }
+
+            // Check if token is expired
+            if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Password reset attempted with expired token for user: {UserId}", user.Id);
+                return AuthResult.Failure("Reset token has expired");
+            }
+
+            // Update password and clear reset token
+            user.PasswordHash = HashPassword(newPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+
+            _logger.LogInformation("Password successfully reset for user {UserId}", user.Id);
+
+            return AuthResult.Success("Password has been successfully reset");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during password reset");
+            return AuthResult.Failure("An error occurred while resetting your password");
+        }
+    }
+
+    private static string GeneratePasswordResetToken()
+    {
+        // Generate a secure random token
+        var randomBytes = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(randomBytes);
+        return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Replace("=", "");
+    }
+
     private static string HashPassword(string password)
     {
-        // In a real implementation, use BCrypt.Net-Next or similar
-        // For now, return a placeholder hash
-        return "placeholder_hash_" + password; // TODO: Implement proper password hashing
+        // Use BCrypt with a work factor of 12 (good balance between security and performance)
+        return BCrypt.Net.BCrypt.HashPassword(password, BCrypt.Net.BCrypt.GenerateSalt(12));
     }
 
     private static bool VerifyPassword(string password, string hash)
     {
-        // In a real implementation, use BCrypt.Net-Next or similar
-        // For now, return a placeholder verification
-        return hash == "placeholder_hash_" + password; // TODO: Implement proper password verification
+        try
+        {
+            // Verify the password against the BCrypt hash
+            return BCrypt.Net.BCrypt.Verify(password, hash);
+        }
+        catch (BCrypt.Net.SaltParseException)
+        {
+            // Invalid hash format
+            return false;
+        }
     }
 }
 
@@ -238,6 +351,8 @@ public interface IAuthService
     Task<AuthResult> RegisterAsync(RegisterRequest request);
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
     Task<AuthResult> ValidateTokenAsync(string token);
+    Task<AuthResult> ForgotPasswordAsync(string email);
+    Task<AuthResult> ResetPasswordAsync(string token, string newPassword);
 }
 
 /// <summary>
@@ -258,7 +373,7 @@ public class AuthResult
     }
 
     public static AuthResult Success(string message) => new(true, message);
-    
+
     public static AuthResult Success(string accessToken, string refreshToken, AuthUserInfo user) => new(true, "Login successful")
     {
         AccessToken = accessToken,
@@ -273,27 +388,3 @@ public class AuthResult
 
     public static AuthResult Failure(string message) => new(false, message);
 }
-
-/// <summary>
-/// Authentication user information
-/// </summary>
-public class AuthUserInfo
-{
-    public Guid UserId { get; set; }
-    public string Email { get; set; } = string.Empty;
-    public string FirstName { get; set; } = string.Empty;
-    public string LastName { get; set; } = string.Empty;
-    public Guid OrganizationId { get; set; }
-    public string Role { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// User registration request
-/// </summary>
-public class RegisterRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-    public string FirstName { get; set; } = string.Empty;
-    public string LastName { get; set; } = string.Empty;
-} 
