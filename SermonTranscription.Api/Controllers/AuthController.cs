@@ -14,11 +14,13 @@ namespace SermonTranscription.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly InvitationService _invitationService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, InvitationService invitationService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _invitationService = invitationService;
         _logger = logger;
     }
 
@@ -59,7 +61,7 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred during login",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
             });
         }
     }
@@ -108,7 +110,7 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred during registration",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
             });
         }
     }
@@ -149,7 +151,7 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred during token refresh",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
             });
         }
     }
@@ -195,7 +197,7 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred during token validation",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
             });
         }
     }
@@ -251,7 +253,7 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred while processing your request",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
             });
         }
     }
@@ -291,7 +293,105 @@ public class AuthController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred while resetting your password",
-                Errors = new[] { "Internal server error" }
+                Errors = ["Internal server error"]
+            });
+        }
+    }
+
+    /// <summary>
+    /// Invite a user to join an organization
+    /// </summary>
+    /// <param name="request">Invitation request</param>
+    /// <returns>Invitation result</returns>
+    [HttpPost("invite")]
+    [Authorize]
+    [ProducesResponseType(typeof(InviteUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
+    {
+        try
+        {
+            // Get current user info from JWT claims
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            var organizationIdClaim = User.FindFirst("organizationId")?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || string.IsNullOrEmpty(organizationIdClaim))
+            {
+                return Unauthorized(new ErrorResponse
+                {
+                    Message = "Invalid authentication token",
+                    Errors = new[] { "Missing user or organization information" }
+                });
+            }
+
+            if (!Guid.TryParse(userIdClaim, out var userId) || !Guid.TryParse(organizationIdClaim, out var organizationId))
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = "Invalid user or organization ID",
+                    Errors = new[] { "Invalid ID format" }
+                });
+            }
+
+            var result = await _invitationService.InviteUserAsync(request, organizationId, userId);
+
+            if (!result.Success)
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = result.Message,
+                    Errors = new[] { result.Message }
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during user invitation");
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred while sending the invitation",
+                Errors = ["Internal server error"]
+            });
+        }
+    }
+
+    /// <summary>
+    /// Accept an invitation to join an organization
+    /// </summary>
+    /// <param name="request">Invitation acceptance request</param>
+    /// <returns>Acceptance result with authentication tokens</returns>
+    [HttpPost("accept-invitation")]
+    [ProducesResponseType(typeof(AcceptInvitationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
+    {
+        try
+        {
+            var result = await _invitationService.AcceptInvitationAsync(request);
+
+            if (!result.Success)
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = result.Message,
+                    Errors = new[] { result.Message }
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during invitation acceptance");
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred while accepting the invitation",
+                Errors = ["Internal server error"]
             });
         }
     }

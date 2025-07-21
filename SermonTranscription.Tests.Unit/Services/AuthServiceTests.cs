@@ -5,6 +5,7 @@ using SermonTranscription.Application.DTOs;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Tests.Unit.Common;
 using System.Security.Cryptography;
 using Xunit;
@@ -17,6 +18,8 @@ public class AuthServiceTests : BaseUnitTest
     private readonly Mock<IUserOrganizationRepository> _mockUserOrganizationRepository;
     private readonly Mock<IJwtService> _mockJwtService;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
+    private readonly Mock<IPasswordHasher> _mockPasswordHasher;
+    private readonly Mock<IPasswordValidator> _mockPasswordValidator;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
@@ -25,12 +28,16 @@ public class AuthServiceTests : BaseUnitTest
         _mockUserOrganizationRepository = new Mock<IUserOrganizationRepository>();
         _mockJwtService = new Mock<IJwtService>();
         _mockLogger = new Mock<ILogger<AuthService>>();
+        _mockPasswordHasher = new Mock<IPasswordHasher>();
+        _mockPasswordValidator = new Mock<IPasswordValidator>();
 
         _authService = new AuthService(
             _mockUserRepository.Object,
             _mockUserOrganizationRepository.Object,
             _mockJwtService.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockPasswordHasher.Object,
+            _mockPasswordValidator.Object);
     }
 
     [Fact]
@@ -53,6 +60,10 @@ public class AuthServiceTests : BaseUnitTest
             .Setup(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User user, CancellationToken token) => user);
 
+        _mockPasswordHasher
+            .Setup(x => x.HashPassword(request.Password))
+            .Returns("hashed_password");
+
         // Act
         var result = await _authService.RegisterAsync(request);
 
@@ -60,6 +71,7 @@ public class AuthServiceTests : BaseUnitTest
         Assert.True(result.IsSuccess);
         Assert.Equal("User registered successfully. Please check your email to verify your account.", result.Message);
         _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockPasswordHasher.Verify(x => x.HashPassword(request.Password), Times.Once);
     }
 
     [Fact]
@@ -94,7 +106,7 @@ public class AuthServiceTests : BaseUnitTest
         // Arrange
         var email = "test@example.com";
         var password = "password123";
-        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+        var hashedPassword = "hashed_password";
 
         var user = new User
         {
@@ -128,6 +140,10 @@ public class AuthServiceTests : BaseUnitTest
         _mockJwtService
             .Setup(x => x.GenerateRefreshToken(user))
             .Returns("refresh_token");
+
+        _mockPasswordHasher
+            .Setup(x => x.VerifyPassword(password, hashedPassword))
+            .Returns(true);
 
         // Act
         var result = await _authService.LoginAsync(email, password);
@@ -165,9 +181,8 @@ public class AuthServiceTests : BaseUnitTest
     {
         // Arrange
         var email = "test@example.com";
-        var correctPassword = "correctpassword123";
         var wrongPassword = "wrongpassword123";
-        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(correctPassword);
+        var hashedPassword = "hashed_password";
 
         var user = new User
         {
@@ -181,6 +196,10 @@ public class AuthServiceTests : BaseUnitTest
         _mockUserRepository
             .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
+
+        _mockPasswordHasher
+            .Setup(x => x.VerifyPassword(wrongPassword, hashedPassword))
+            .Returns(false);
 
         // Act
         var result = await _authService.LoginAsync(email, wrongPassword);
@@ -196,7 +215,7 @@ public class AuthServiceTests : BaseUnitTest
         // Arrange
         var email = "test@example.com";
         var password = "password123";
-        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+        var hashedPassword = "hashed_password";
 
         var user = new User
         {
@@ -289,6 +308,10 @@ public class AuthServiceTests : BaseUnitTest
             .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        _mockPasswordHasher
+            .Setup(x => x.HashPassword(newPassword))
+            .Returns("new_hashed_password");
+
         // Act
         var result = await _authService.ResetPasswordAsync(token, newPassword);
 
@@ -296,6 +319,7 @@ public class AuthServiceTests : BaseUnitTest
         Assert.True(result.IsSuccess);
         Assert.Equal("Password has been successfully reset", result.Message);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockPasswordHasher.Verify(x => x.HashPassword(newPassword), Times.Once);
     }
 
     [Fact]
@@ -392,6 +416,10 @@ public class AuthServiceTests : BaseUnitTest
             LastName = "Doe"
         };
 
+        _mockPasswordValidator
+            .Setup(x => x.Validate(request.Password))
+            .Throws(new PasswordValidationDomainException("Password must be at least 8 characters long"));
+
         // Act
         var result = await _authService.RegisterAsync(request);
 
@@ -425,8 +453,28 @@ public class AuthServiceTests : BaseUnitTest
     [Fact]
     public async Task ResetPasswordAsync_WithShortPassword_ShouldReturnFailure()
     {
+        // Arrange
+        var token = "valid_token";
+        var shortPassword = "123";
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "test@example.com",
+            PasswordResetToken = token,
+            PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1)
+        };
+
+        _mockUserRepository
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockPasswordValidator
+            .Setup(x => x.Validate(shortPassword))
+            .Throws(new PasswordValidationDomainException("Password must be at least 8 characters long"));
+
         // Act
-        var result = await _authService.ResetPasswordAsync("valid_token", "123");
+        var result = await _authService.ResetPasswordAsync(token, shortPassword);
 
         // Assert
         Assert.False(result.IsSuccess);

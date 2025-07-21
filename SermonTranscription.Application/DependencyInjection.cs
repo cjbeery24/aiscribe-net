@@ -17,7 +17,10 @@ public static class DependencyInjection
 
         // Service registrations
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<InvitationService>();
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<IPasswordValidator, PasswordValidator>();
 
         return services;
     }
-} 
+}

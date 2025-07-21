@@ -53,8 +53,8 @@ public static class DependencyInjection
         // services.AddScoped<ITranscriptionSessionRepository, Repositories.TranscriptionSessionRepository>();
         // services.AddScoped<ISubscriptionRepository, Repositories.SubscriptionRepository>();
 
-        // Service registrations (to be implemented)
-        // services.AddScoped<Infrastructure.Services.EmailService>();
+        // Service registrations
+        services.AddScoped<IEmailService, EmailService>();
         // services.AddScoped<Infrastructure.Services.StripeService>();
 
         return services;

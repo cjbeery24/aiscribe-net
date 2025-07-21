@@ -17,17 +17,23 @@ public class AuthService : IAuthService
     private readonly IUserOrganizationRepository _userOrganizationRepository;
     private readonly IJwtService _jwtService;
     private readonly ILogger<AuthService> _logger;
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly IPasswordValidator _passwordValidator;
 
     public AuthService(
         IUserRepository userRepository,
         IUserOrganizationRepository userOrganizationRepository,
         IJwtService jwtService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IPasswordHasher passwordHasher,
+        IPasswordValidator passwordValidator)
     {
         _userRepository = userRepository;
         _userOrganizationRepository = userOrganizationRepository;
         _jwtService = jwtService;
         _logger = logger;
+        _passwordHasher = passwordHasher;
+        _passwordValidator = passwordValidator;
     }
 
     public async Task<AuthResult> LoginAsync(string email, string password)
@@ -63,7 +69,7 @@ public class AuthService : IAuthService
             }
 
             // Verify password (assuming BCrypt is used)
-            if (!VerifyPassword(password, user.PasswordHash))
+            if (!_passwordHasher.VerifyPassword(password, user.PasswordHash))
             {
                 _logger.LogWarning("Login attempt with invalid password for user: {UserId}", user.Id);
                 return AuthResult.Failure("Invalid email or password");
@@ -120,10 +126,7 @@ public class AuthService : IAuthService
                 return AuthResult.Failure("First name and last name are required");
             }
 
-            if (request.Password.Length < 8)
-            {
-                return AuthResult.Failure("Password must be at least 8 characters long");
-            }
+            _passwordValidator.Validate(request.Password);
 
             // Check if user already exists
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
@@ -139,7 +142,7 @@ public class AuthService : IAuthService
                 Email = request.Email.ToLowerInvariant(),
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                PasswordHash = HashPassword(request.Password),
+                PasswordHash = _passwordHasher.HashPassword(request.Password),
                 IsEmailVerified = false, // Will be verified via email
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -150,6 +153,11 @@ public class AuthService : IAuthService
             _logger.LogInformation("New user registered: {UserId}", user.Id);
 
             return AuthResult.Success("User registered successfully. Please check your email to verify your account.");
+        }
+        catch (PasswordValidationDomainException ex)
+        {
+            _logger.LogWarning("Password validation failed during registration for email: {Email}", request.Email);
+            return AuthResult.Failure(ex.Message);
         }
         catch (Exception ex)
         {
@@ -274,10 +282,7 @@ public class AuthService : IAuthService
                 return AuthResult.Failure("Token and new password are required");
             }
 
-            if (newPassword.Length < 8)
-            {
-                return AuthResult.Failure("Password must be at least 8 characters long");
-            }
+            _passwordValidator.Validate(newPassword);
 
             // Find user by reset token
             var user = await _userRepository.GetByPasswordResetTokenAsync(token);
@@ -295,7 +300,7 @@ public class AuthService : IAuthService
             }
 
             // Update password and clear reset token
-            user.PasswordHash = HashPassword(newPassword);
+            user.PasswordHash = _passwordHasher.HashPassword(newPassword);
             user.PasswordResetToken = null;
             user.PasswordResetTokenExpiry = null;
             user.UpdatedAt = DateTime.UtcNow;
@@ -304,6 +309,11 @@ public class AuthService : IAuthService
             _logger.LogInformation("Password successfully reset for user {UserId}", user.Id);
 
             return AuthResult.Success("Password has been successfully reset");
+        }
+        catch (PasswordValidationDomainException ex)
+        {
+            _logger.LogWarning("Password validation failed during password reset");
+            return AuthResult.Failure(ex.Message);
         }
         catch (Exception ex)
         {
@@ -319,26 +329,6 @@ public class AuthService : IAuthService
         using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         rng.GetBytes(randomBytes);
         return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Replace("=", "");
-    }
-
-    private static string HashPassword(string password)
-    {
-        // Use BCrypt with a work factor of 12 (good balance between security and performance)
-        return BCrypt.Net.BCrypt.HashPassword(password, BCrypt.Net.BCrypt.GenerateSalt(12));
-    }
-
-    private static bool VerifyPassword(string password, string hash)
-    {
-        try
-        {
-            // Verify the password against the BCrypt hash
-            return BCrypt.Net.BCrypt.Verify(password, hash);
-        }
-        catch (BCrypt.Net.SaltParseException)
-        {
-            // Invalid hash format
-            return false;
-        }
     }
 }
 
