@@ -233,7 +233,7 @@ public class InvitationService
             }
 
             // Generate JWT tokens
-            var accessToken = _jwtService.GenerateAccessToken(user, userOrganization.OrganizationId, userOrganization.Role.ToString());
+            var accessToken = _jwtService.GenerateAccessToken(user);
             var refreshToken = _jwtService.GenerateRefreshToken(user);
 
             return new AcceptInvitationResponse

@@ -25,7 +25,7 @@ public class JwtService : IJwtService
         _logger = logger;
     }
 
-    public string GenerateAccessToken(User user, Guid organizationId, string role)
+    public string GenerateAccessToken(User user)
     {
         try
         {
@@ -37,8 +37,6 @@ public class JwtService : IJwtService
                 new(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new(ClaimTypes.Email, user.Email),
                 new(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
-                new(ClaimTypes.Role, role),
-                new("organizationId", organizationId.ToString()),
                 new("userId", user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
@@ -70,9 +68,9 @@ public class JwtService : IJwtService
             var randomNumber = new byte[64];
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
-            
+
             var refreshToken = Convert.ToBase64String(randomNumber);
-            
+
             _logger.LogInformation("Generated refresh token for user {UserId}", user.Id);
             return refreshToken;
         }
@@ -83,7 +81,7 @@ public class JwtService : IJwtService
         }
     }
 
-    public JwtUserInfo? ValidateToken(string token)
+    public async Task<JwtUserInfo?> ValidateTokenAsync(string token)
     {
         try
         {
@@ -102,7 +100,7 @@ public class JwtService : IJwtService
                 ClockSkew = TimeSpan.FromMinutes(_jwtSettings.ClockSkewMinutes)
             };
 
-            var result = tokenHandler.ValidateToken(token, validationParameters);
+            var result = await tokenHandler.ValidateTokenAsync(token, validationParameters);
 
             if (!result.IsValid || result.ClaimsIdentity == null)
             {
@@ -112,8 +110,6 @@ public class JwtService : IJwtService
 
             var userIdClaim = result.ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var emailClaim = result.ClaimsIdentity.FindFirst(ClaimTypes.Email)?.Value;
-            var roleClaim = result.ClaimsIdentity.FindFirst(ClaimTypes.Role)?.Value;
-            var organizationIdClaim = result.ClaimsIdentity.FindFirst("organizationId")?.Value;
 
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
@@ -121,18 +117,10 @@ public class JwtService : IJwtService
                 return null;
             }
 
-            if (string.IsNullOrEmpty(organizationIdClaim) || !Guid.TryParse(organizationIdClaim, out var organizationId))
-            {
-                _logger.LogWarning("Invalid organization ID in token");
-                return null;
-            }
-
             return new JwtUserInfo
             {
                 UserId = userId,
                 Email = emailClaim ?? string.Empty,
-                Role = roleClaim ?? string.Empty,
-                OrganizationId = organizationId,
                 ExpiresAt = result.SecurityToken.ValidTo
             };
         }
@@ -158,7 +146,7 @@ public class JwtService : IJwtService
         try
         {
             var tokenHandler = new JsonWebTokenHandler();
-            
+
             if (!tokenHandler.CanReadToken(token))
             {
                 return null;
@@ -180,32 +168,4 @@ public class JwtService : IJwtService
             return null;
         }
     }
-
-    public Guid? GetOrganizationIdFromToken(string token)
-    {
-        try
-        {
-            var tokenHandler = new JsonWebTokenHandler();
-            
-            if (!tokenHandler.CanReadToken(token))
-            {
-                return null;
-            }
-
-            var jsonWebToken = tokenHandler.ReadJsonWebToken(token);
-            var organizationIdClaim = jsonWebToken.Claims.FirstOrDefault(c => c.Type == "organizationId")?.Value;
-
-            if (string.IsNullOrEmpty(organizationIdClaim) || !Guid.TryParse(organizationIdClaim, out var organizationId))
-            {
-                return null;
-            }
-
-            return organizationId;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error extracting organization ID from token");
-            return null;
-        }
-    }
-} 
+}

@@ -134,7 +134,7 @@ public class AuthServiceTests : BaseUnitTest
             .ReturnsAsync(new List<UserOrganization> { userOrg });
 
         _mockJwtService
-            .Setup(x => x.GenerateAccessToken(user, userOrg.OrganizationId, userOrg.Role.ToString()))
+            .Setup(x => x.GenerateAccessToken(user))
             .Returns("access_token");
 
         _mockJwtService
@@ -558,7 +558,7 @@ public class AuthServiceTests : BaseUnitTest
             .ReturnsAsync(new List<UserOrganization> { membership });
 
         _mockJwtService
-            .Setup(x => x.GenerateAccessToken(user, organizationId, membership.Role.ToString()))
+            .Setup(x => x.GenerateAccessToken(user))
             .Returns(newAccessToken);
 
         _mockJwtService
@@ -586,8 +586,8 @@ public class AuthServiceTests : BaseUnitTest
         Assert.Equal(newRefreshToken, result.RefreshToken);
         Assert.NotNull(result.User);
         Assert.Equal(userId, result.User.UserId);
-        Assert.Equal(organizationId, result.User.OrganizationId);
-        Assert.Equal(membership.Role.ToString(), result.User.Role);
+        // Note: OrganizationId and Role are no longer included in AuthUserInfo
+        // as they're determined per-request via X-Organization-ID header
 
         _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
         _mockUserRepository.Verify(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);

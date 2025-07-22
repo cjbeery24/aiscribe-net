@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using SermonTranscription.Domain.Entities;
-using SermonTranscription.Domain.Enums;
 using SermonTranscription.Infrastructure.Configuration;
 using SermonTranscription.Infrastructure.Services;
 using SermonTranscription.Tests.Unit.Common;
@@ -41,12 +40,8 @@ public class JwtServiceTests : BaseUnitTest
     [Fact]
     public void GenerateAccessToken_ShouldCreateValidToken()
     {
-        // Arrange
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationAdmin.ToString();
-
         // Act
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = _jwtService.GenerateAccessToken(_testUser);
 
         // Assert
         token.Should().NotBeNullOrEmpty();
@@ -55,22 +50,17 @@ public class JwtServiceTests : BaseUnitTest
     }
 
     [Fact]
-    public void GenerateAccessToken_ShouldIncludeUserClaims()
+    public async Task GenerateAccessToken_ShouldIncludeUserClaims()
     {
-        // Arrange
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
-
         // Act
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role);
-        var userInfo = _jwtService.ValidateToken(token);
+        var token = _jwtService.GenerateAccessToken(_testUser);
+        var userInfo = await _jwtService.ValidateTokenAsync(token);
 
         // Assert
         userInfo.Should().NotBeNull();
         userInfo!.UserId.Should().Be(_testUser.Id);
         userInfo.Email.Should().Be(_testUser.Email);
-        userInfo.Role.Should().Be(role);
-        userInfo.OrganizationId.Should().Be(organizationId);
+        userInfo.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]
@@ -86,40 +76,36 @@ public class JwtServiceTests : BaseUnitTest
     }
 
     [Fact]
-    public void ValidateToken_ShouldReturnUserInfo_ForValidToken()
+    public async Task ValidateToken_ShouldReturnUserInfo_ForValidToken()
     {
         // Arrange
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationAdmin.ToString();
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = _jwtService.GenerateAccessToken(_testUser);
 
         // Act
-        var userInfo = _jwtService.ValidateToken(token);
+        var userInfo = await _jwtService.ValidateTokenAsync(token);
 
         // Assert
         userInfo.Should().NotBeNull();
         userInfo!.UserId.Should().Be(_testUser.Id);
         userInfo.Email.Should().Be(_testUser.Email);
-        userInfo.Role.Should().Be(role);
-        userInfo.OrganizationId.Should().Be(organizationId);
         userInfo.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]
-    public void ValidateToken_ShouldReturnNull_ForInvalidToken()
+    public async Task ValidateToken_ShouldReturnNull_ForInvalidToken()
     {
         // Arrange
         var invalidToken = "invalid.token.here";
 
         // Act
-        var userInfo = _jwtService.ValidateToken(invalidToken);
+        var userInfo = await _jwtService.ValidateTokenAsync(invalidToken);
 
         // Assert
         userInfo.Should().BeNull();
     }
 
     [Fact]
-    public void ValidateToken_ShouldReturnNull_ForExpiredToken()
+    public async Task ValidateToken_ShouldReturnNull_ForExpiredToken()
     {
         // Arrange
         var expiredSettings = new JwtSettings
@@ -132,22 +118,20 @@ public class JwtServiceTests : BaseUnitTest
         };
 
         var expiredJwtService = new JwtService(Options.Create(expiredSettings), _loggerMock.Object);
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
-        var token = expiredJwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = expiredJwtService.GenerateAccessToken(_testUser);
 
         // Wait a moment to ensure token is expired
         Thread.Sleep(100);
 
         // Act
-        var userInfo = _jwtService.ValidateToken(token);
+        var userInfo = await _jwtService.ValidateTokenAsync(token);
 
         // Assert
         userInfo.Should().BeNull();
     }
 
     [Fact]
-    public void ValidateToken_ShouldReturnNull_ForTokenWithWrongIssuer()
+    public async Task ValidateToken_ShouldReturnNull_ForTokenWithWrongIssuer()
     {
         // Arrange
         var wrongIssuerSettings = new JwtSettings
@@ -160,19 +144,17 @@ public class JwtServiceTests : BaseUnitTest
         };
 
         var wrongIssuerJwtService = new JwtService(Options.Create(wrongIssuerSettings), _loggerMock.Object);
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
-        var token = wrongIssuerJwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = wrongIssuerJwtService.GenerateAccessToken(_testUser);
 
         // Act
-        var userInfo = _jwtService.ValidateToken(token);
+        var userInfo = await _jwtService.ValidateTokenAsync(token);
 
         // Assert
         userInfo.Should().BeNull();
     }
 
     [Fact]
-    public void ValidateToken_ShouldReturnNull_ForTokenWithWrongAudience()
+    public async Task ValidateToken_ShouldReturnNull_ForTokenWithWrongAudience()
     {
         // Arrange
         var wrongAudienceSettings = new JwtSettings
@@ -185,12 +167,10 @@ public class JwtServiceTests : BaseUnitTest
         };
 
         var wrongAudienceJwtService = new JwtService(Options.Create(wrongAudienceSettings), _loggerMock.Object);
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
-        var token = wrongAudienceJwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = wrongAudienceJwtService.GenerateAccessToken(_testUser);
 
         // Act
-        var userInfo = _jwtService.ValidateToken(token);
+        var userInfo = await _jwtService.ValidateTokenAsync(token);
 
         // Assert
         userInfo.Should().BeNull();
@@ -200,9 +180,7 @@ public class JwtServiceTests : BaseUnitTest
     public void GetUserIdFromToken_ShouldReturnUserId_ForValidToken()
     {
         // Arrange
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var token = _jwtService.GenerateAccessToken(_testUser);
 
         // Act
         var userId = _jwtService.GetUserIdFromToken(token);
@@ -225,52 +203,6 @@ public class JwtServiceTests : BaseUnitTest
     }
 
     [Fact]
-    public void GetOrganizationIdFromToken_ShouldReturnOrganizationId_ForValidToken()
-    {
-        // Arrange
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationAdmin.ToString();
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role);
-
-        // Act
-        var extractedOrganizationId = _jwtService.GetOrganizationIdFromToken(token);
-
-        // Assert
-        extractedOrganizationId.Should().Be(organizationId);
-    }
-
-    [Fact]
-    public void GetOrganizationIdFromToken_ShouldReturnNull_ForInvalidToken()
-    {
-        // Arrange
-        var invalidToken = "invalid.token.here";
-
-        // Act
-        var organizationId = _jwtService.GetOrganizationIdFromToken(invalidToken);
-
-        // Assert
-        organizationId.Should().BeNull();
-    }
-
-    [Theory]
-    [InlineData(UserRole.OrganizationAdmin)]
-    [InlineData(UserRole.OrganizationUser)]
-    [InlineData(UserRole.ReadOnlyUser)]
-    public void GenerateAccessToken_ShouldWorkWithAllRoles(UserRole role)
-    {
-        // Arrange
-        var organizationId = Guid.NewGuid();
-
-        // Act
-        var token = _jwtService.GenerateAccessToken(_testUser, organizationId, role.ToString());
-        var userInfo = _jwtService.ValidateToken(token);
-
-        // Assert
-        userInfo.Should().NotBeNull();
-        userInfo!.Role.Should().Be(role.ToString());
-    }
-
-    [Fact]
     public void GenerateAccessToken_ShouldThrowException_WhenSecretKeyIsTooShort()
     {
         // Arrange
@@ -284,11 +216,9 @@ public class JwtServiceTests : BaseUnitTest
         };
 
         var shortKeyJwtService = new JwtService(Options.Create(shortKeySettings), _loggerMock.Object);
-        var organizationId = Guid.NewGuid();
-        var role = UserRole.OrganizationUser.ToString();
 
         // Act & Assert
-        var act = () => shortKeyJwtService.GenerateAccessToken(_testUser, organizationId, role);
+        var act = () => shortKeyJwtService.GenerateAccessToken(_testUser);
         act.Should().Throw<InvalidOperationException>();
     }
-} 
+}

@@ -134,53 +134,58 @@ try
     // Authorization
     builder.Services.AddAuthorization(options =>
     {
-        // Organization Admin Policy - full access to organization resources
+        // Organization Admin Policy - requires admin role (validated by TenantMiddleware)
         options.AddPolicy(AuthorizationPolicies.OrganizationAdmin, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Admin)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.IsAdmin()));
 
-        // Organization User Policy - can manage transcriptions and view data
+        // Organization User Policy - requires user or admin role
         options.AddPolicy(AuthorizationPolicies.OrganizationUser, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanManageTranscriptions()));
 
-        // Read Only User Policy - can only view transcriptions
+        // Read Only User Policy - requires any valid role
         options.AddPolicy(AuthorizationPolicies.ReadOnlyUser, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanViewTranscriptions()));
 
         // Can Manage Users Policy
         options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageUsers)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanManageUsers()));
 
         // Can Manage Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanManageTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ManageTranscriptions)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanManageTranscriptions()));
 
         // Can View Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanViewTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ViewTranscriptions)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanViewTranscriptions()));
 
         // Can Export Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanExportTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.ExportTranscriptions)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.CanExportTranscriptions()));
 
-        // Organization Member Policy - any active member
+        // Organization Member Policy - any active member (validated by TenantMiddleware)
         options.AddPolicy(AuthorizationPolicies.OrganizationMember, policy =>
             policy.RequireAuthenticatedUser()
-                   .AddRequirements(new OrganizationRequirement(OrganizationPermissionType.Member)));
+                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                               httpContext.GetTenantContext() != null));
 
         // Authenticated User Policy - any valid JWT token
         options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
             policy.RequireAuthenticatedUser());
     });
-
-    // Register authorization handlers
-    builder.Services.AddScoped<IAuthorizationHandler, OrganizationAuthorizationHandler>();
 
     // API Versioning
     builder.Services.AddApiVersioning(opt =>

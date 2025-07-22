@@ -69,6 +69,7 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.Request.Path = "/api/transcriptions";
         _httpContext.RequestServices = ServiceProvider;
         _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationAdmin.ToString());
+        _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserRepository
             .Setup(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()))
@@ -93,6 +94,7 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.Request.Path = "/api/transcriptions";
         _httpContext.RequestServices = ServiceProvider;
         _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationUser.ToString());
+        _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserRepository
             .Setup(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()))
@@ -115,6 +117,7 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.Request.Path = "/api/transcriptions";
         _httpContext.RequestServices = ServiceProvider;
         _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationUser.ToString());
+        _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserRepository
             .Setup(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()))
@@ -130,8 +133,9 @@ public class TenantMiddlewareTests : BaseUnitTest
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new("organization_id", organizationId.ToString()),
-            new(ClaimTypes.Role, role)
+            new(ClaimTypes.Email, "test@example.com"),
+            new(ClaimTypes.Name, "Test User")
+            // Note: organization_id and role claims are no longer included in JWT tokens
         };
 
         var identity = new ClaimsIdentity(claims, "Test");

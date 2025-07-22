@@ -15,4 +15,5 @@ public class OrganizationSummaryDto
     public int ActiveUserCount { get; set; }
     public int MaxUsers { get; set; }
     public bool HasActiveSubscription { get; set; }
+    public string? Role { get; set; } // User's role in this organization (null if not a member)
 }

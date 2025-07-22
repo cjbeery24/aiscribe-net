@@ -84,8 +84,8 @@ public class AuthService : IAuthService
                 return AuthResult.Failure("User is not associated with any organization");
             }
 
-            // Generate tokens
-            var accessToken = _jwtService.GenerateAccessToken(user, primaryMembership.OrganizationId, primaryMembership.Role.ToString());
+            // Generate tokens (JWT contains only user identity, no tenant info)
+            var accessToken = _jwtService.GenerateAccessToken(user);
             var refreshToken = await IssueRefreshTokenAsync(user);
 
             // Update user's last login
@@ -99,9 +99,8 @@ public class AuthService : IAuthService
                 UserId = user.Id,
                 Email = user.Email,
                 FirstName = user.FirstName,
-                LastName = user.LastName,
-                OrganizationId = primaryMembership.OrganizationId,
-                Role = primaryMembership.Role.ToString()
+                LastName = user.LastName
+                // OrganizationId and Role are no longer included as they're determined per-request
             });
         }
         catch (Exception ex)
@@ -217,8 +216,8 @@ public class AuthService : IAuthService
                 return AuthResult.Failure("User is not associated with any organization");
             }
 
-            // Generate new tokens
-            var newAccessToken = _jwtService.GenerateAccessToken(user, primaryMembership.OrganizationId, primaryMembership.Role.ToString());
+            // Generate new tokens (JWT contains only user identity, no tenant info)
+            var newAccessToken = _jwtService.GenerateAccessToken(user);
             var newRefreshToken = _jwtService.GenerateRefreshToken(user);
 
             // Revoke the old refresh token and add the new one
@@ -245,9 +244,8 @@ public class AuthService : IAuthService
                 UserId = user.Id,
                 Email = user.Email,
                 FirstName = user.FirstName,
-                LastName = user.LastName,
-                OrganizationId = primaryMembership.OrganizationId,
-                Role = primaryMembership.Role.ToString()
+                LastName = user.LastName
+                // OrganizationId and Role are no longer included as they're determined per-request
             });
         }
         catch (Exception ex)
@@ -321,7 +319,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var userInfo = _jwtService.ValidateToken(token);
+            var userInfo = await _jwtService.ValidateTokenAsync(token);
             if (userInfo == null)
             {
                 return AuthResult.Failure("Invalid or expired token");
@@ -334,22 +332,17 @@ public class AuthService : IAuthService
                 return AuthResult.Failure("User account is no longer valid");
             }
 
-            // Check if user still has membership in the organization
-            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userInfo.UserId);
-            var membership = memberships.FirstOrDefault(m => m.OrganizationId == userInfo.OrganizationId && m.IsActive);
-            if (membership == null)
-            {
-                return AuthResult.Failure("User is no longer a member of this organization");
-            }
+            // Note: With the new approach, organization context is determined by X-Organization-ID header
+            // This method only validates that the user exists and is active
+            // Organization membership and role are checked in the TenantMiddleware
 
             return AuthResult.Success(new AuthUserInfo
             {
                 UserId = userInfo.UserId,
                 Email = userInfo.Email,
                 FirstName = user.FirstName,
-                LastName = user.LastName,
-                OrganizationId = userInfo.OrganizationId,
-                Role = userInfo.Role
+                LastName = user.LastName
+                // OrganizationId and Role are no longer included as they're determined per-request
             });
         }
         catch (Exception ex)
@@ -465,6 +458,41 @@ public class AuthService : IAuthService
         rng.GetBytes(randomBytes);
         return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Replace("=", "");
     }
+
+    public async Task<List<OrganizationSummaryDto>> GetUserOrganizationsAsync(Guid userId)
+    {
+        try
+        {
+            // Get user with organization memberships
+            var user = await _userRepository.GetByIdWithOrganizationsAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found: {UserId}", userId);
+                return new List<OrganizationSummaryDto>();
+            }
+
+            // Get active organization memberships
+            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId);
+            var activeMemberships = memberships.Where(m => m.IsActive).ToList();
+
+            // Convert to DTOs
+            var organizationDtos = activeMemberships.Select(membership => new OrganizationSummaryDto
+            {
+                Id = membership.Organization.Id,
+                Name = membership.Organization.Name,
+                Role = membership.Role.ToString(),
+                IsActive = membership.IsActive
+            }).ToList();
+
+            _logger.LogDebug("Retrieved {Count} organizations for user {UserId}", organizationDtos.Count, userId);
+            return organizationDtos;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting organizations for user {UserId}", userId);
+            throw;
+        }
+    }
 }
 
 /// <summary>
@@ -480,6 +508,7 @@ public interface IAuthService
     Task<AuthResult> ValidateTokenAsync(string token);
     Task<AuthResult> ForgotPasswordAsync(string email);
     Task<AuthResult> ResetPasswordAsync(string token, string newPassword);
+    Task<List<OrganizationSummaryDto>> GetUserOrganizationsAsync(Guid userId);
 }
 
 /// <summary>

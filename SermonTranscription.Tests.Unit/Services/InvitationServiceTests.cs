@@ -366,7 +366,7 @@ public class InvitationServiceTests
             .Returns("hashed_password");
 
         _mockJwtService
-            .Setup(x => x.GenerateAccessToken(user, userOrganization.OrganizationId, userOrganization.Role.ToString()))
+            .Setup(x => x.GenerateAccessToken(user))
             .Returns("access_token");
 
         _mockJwtService

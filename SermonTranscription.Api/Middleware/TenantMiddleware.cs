@@ -31,7 +31,27 @@ public class TenantMiddleware
                 return;
             }
 
-            // Extract organization context from JWT claims
+            // Check if user is authenticated (required for all non-public endpoints)
+            if (!context.User.Identity?.IsAuthenticated ?? true)
+            {
+                _logger.LogWarning("Unauthenticated request to {Path}", context.Request.Path);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "Authentication required",
+                    errors = new[] { "Valid JWT token is required" }
+                });
+                return;
+            }
+
+            // Skip tenant resolution for organization-agnostic endpoints
+            if (IsOrganizationAgnosticEndpoint(context.Request.Path))
+            {
+                await _next(context);
+                return;
+            }
+
+            // Extract organization context from X-Organization-ID header
             var tenantContext = await ResolveTenantContextAsync(context, userRepository);
 
             if (tenantContext != null)
@@ -47,7 +67,17 @@ public class TenantMiddleware
             }
             else
             {
+                // For authenticated requests that require tenant context, return 403 Forbidden
+                // This prevents requests from reaching controllers without proper tenant context
                 _logger.LogWarning("Failed to resolve tenant context for request to {Path}", context.Request.Path);
+
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "Organization context is required but could not be resolved",
+                    errors = new[] { "Missing or invalid X-Organization-ID header", "User is not a member of the specified organization" }
+                });
+                return; // Don't continue to next middleware
             }
 
             await _next(context);
@@ -75,11 +105,11 @@ public class TenantMiddleware
             return null;
         }
 
-        // Extract organization ID from claims
-        var organizationIdClaim = context.User.FindFirst("organization_id");
-        if (organizationIdClaim == null || !Guid.TryParse(organizationIdClaim.Value, out var organizationId))
+        // Extract organization ID from X-Organization-ID header
+        var organizationIdHeader = context.Request.Headers["X-Organization-ID"].FirstOrDefault();
+        if (string.IsNullOrEmpty(organizationIdHeader) || !Guid.TryParse(organizationIdHeader, out var organizationId))
         {
-            _logger.LogWarning("Organization ID claim not found or invalid for user {UserId}", userId);
+            _logger.LogWarning("X-Organization-ID header not found or invalid for user {UserId}", userId);
             return null;
         }
 
@@ -129,7 +159,7 @@ public class TenantMiddleware
     {
         var pathValue = path.Value?.ToLowerInvariant() ?? string.Empty;
 
-        // Public endpoints that don't require tenant context
+        // Public endpoints that don't require authentication or tenant context
         return pathValue.StartsWith("/health") ||
                pathValue.StartsWith("/swagger") ||
                pathValue.StartsWith("/api-docs") ||
@@ -139,6 +169,14 @@ public class TenantMiddleware
                pathValue.StartsWith("/auth/verify-email") ||
                pathValue.StartsWith("/auth/reset-password") ||
                pathValue.StartsWith("/auth/forgot-password");
+    }
+
+    private static bool IsOrganizationAgnosticEndpoint(PathString path)
+    {
+        var pathValue = path.Value?.ToLowerInvariant() ?? string.Empty;
+
+        // Endpoints that require authentication but don't need organization context
+        return pathValue.StartsWith("/auth/organizations"); // Organization discovery endpoint
     }
 }
 

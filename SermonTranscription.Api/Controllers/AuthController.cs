@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Application.DTOs;
+using SermonTranscription.Api.Authorization;
+using SermonTranscription.Api.Middleware;
 
 namespace SermonTranscription.Api.Controllers;
 
@@ -214,16 +216,8 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var userIdClaim = User.FindFirst("userId")?.Value;
-
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "Invalid authentication token",
-                    Errors = ["Missing or invalid user information"]
-                });
-            }
+            // Get user ID from tenant context (already validated by middleware)
+            var userId = HttpContext.GetUserId()!.Value;
 
             // Revoke all refresh tokens for the current user
             await _authService.RevokeAllUserRefreshTokensAsync(userId);
@@ -331,7 +325,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Invitation request</param>
     /// <returns>Invitation result</returns>
     [HttpPost("invite")]
-    [Authorize]
+    [Authorize(AuthorizationPolicies.CanManageUsers)]
     [ProducesResponseType(typeof(InviteUserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -340,29 +334,10 @@ public class AuthController : ControllerBase
     {
         try
         {
-            // Get current user info from JWT claims
-            var userIdClaim = User.FindFirst("userId")?.Value;
-            var organizationIdClaim = User.FindFirst("organizationId")?.Value;
+            // Get tenant context from middleware (already validated)
+            var tenantContext = HttpContext.GetTenantContext()!;
 
-            if (string.IsNullOrEmpty(userIdClaim) || string.IsNullOrEmpty(organizationIdClaim))
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "Invalid authentication token",
-                    Errors = new[] { "Missing user or organization information" }
-                });
-            }
-
-            if (!Guid.TryParse(userIdClaim, out var userId) || !Guid.TryParse(organizationIdClaim, out var organizationId))
-            {
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Invalid user or organization ID",
-                    Errors = new[] { "Invalid ID format" }
-                });
-            }
-
-            var result = await _invitationService.InviteUserAsync(request, organizationId, userId);
+            var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, tenantContext.UserId);
 
             if (!result.Success)
             {
@@ -423,5 +398,42 @@ public class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get user's available organizations
+    /// </summary>
+    /// <returns>List of organizations the user is a member of</returns>
+    [HttpGet("organizations")]
+    [Authorize]
+    [ProducesResponseType(typeof(List<OrganizationSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetUserOrganizations()
+    {
+        try
+        {
+            // Get user ID from JWT claims (not tenant context, since this endpoint is organization-agnostic)
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new ErrorResponse
+                {
+                    Message = "Invalid user token",
+                    Errors = ["User not authenticated"]
+                });
+            }
 
+            // Get user's organizations from the service
+            var organizations = await _authService.GetUserOrganizationsAsync(userId);
+
+            return Ok(organizations);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting organizations for user");
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "An error occurred while retrieving organizations",
+                Errors = ["Internal server error"]
+            });
+        }
+    }
 }
