@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
+using SermonTranscription.Api.Authorization;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
+using System.Reflection;
 using System.Security.Claims;
 
 namespace SermonTranscription.Api.Middleware;
@@ -24,8 +26,8 @@ public class TenantMiddleware
     {
         try
         {
-            // Skip tenant resolution for public endpoints
-            if (IsPublicEndpoint(context.Request.Path))
+            // Check if endpoint is marked as public
+            if (IsPublicEndpoint(context))
             {
                 await _next(context);
                 return;
@@ -44,15 +46,34 @@ public class TenantMiddleware
                 return;
             }
 
-            // Skip tenant resolution for organization-agnostic endpoints
-            if (IsOrganizationAgnosticEndpoint(context.Request.Path))
+            // Always resolve user context for authenticated requests
+            var userContext = await ResolveUserContextAsync(context, userRepository);
+            if (userContext == null)
+            {
+                // User validation failed
+                _logger.LogWarning("Failed to resolve user context for request to {Path}", context.Request.Path);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "User validation failed",
+                    errors = new[] { "Invalid or inactive user" }
+                });
+                return;
+            }
+
+            // Store user context for all authenticated requests
+            context.Items["UserContext"] = userContext;
+            _logger.LogDebug("User context resolved: {UserId}", userContext.UserId);
+
+            // Check if endpoint is marked as organization-agnostic
+            if (IsOrganizationAgnosticEndpoint(context))
             {
                 await _next(context);
                 return;
             }
 
             // Extract organization context from X-Organization-ID header
-            var tenantContext = await ResolveTenantContextAsync(context, userRepository);
+            var tenantContext = await ResolveTenantContextAsync(context, userRepository, userContext);
 
             if (tenantContext != null)
             {
@@ -63,7 +84,7 @@ public class TenantMiddleware
                 context.Response.Headers.Append("X-Organization-ID", tenantContext.OrganizationId.ToString());
 
                 _logger.LogDebug("Tenant context resolved for user {UserId} in organization {OrganizationId}",
-                    tenantContext.UserId, tenantContext.OrganizationId);
+                    userContext.UserId, tenantContext.OrganizationId);
             }
             else
             {
@@ -89,14 +110,8 @@ public class TenantMiddleware
         }
     }
 
-    private async Task<TenantContext?> ResolveTenantContextAsync(HttpContext context, IUserRepository userRepository)
+    private async Task<UserContext?> ResolveUserContextAsync(HttpContext context, IUserRepository userRepository)
     {
-        // Check if user is authenticated
-        if (!context.User.Identity?.IsAuthenticated ?? true)
-        {
-            return null;
-        }
-
         // Extract user ID from claims
         var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
@@ -105,16 +120,8 @@ public class TenantMiddleware
             return null;
         }
 
-        // Extract organization ID from X-Organization-ID header
-        var organizationIdHeader = context.Request.Headers["X-Organization-ID"].FirstOrDefault();
-        if (string.IsNullOrEmpty(organizationIdHeader) || !Guid.TryParse(organizationIdHeader, out var organizationId))
-        {
-            _logger.LogWarning("X-Organization-ID header not found or invalid for user {UserId}", userId);
-            return null;
-        }
-
-        // Get user with organization membership
-        var user = await userRepository.GetByIdWithOrganizationsAsync(userId);
+        // Get user (without organization membership for organization-agnostic endpoints)
+        var user = await userRepository.GetByIdAsync(userId);
         if (user == null)
         {
             _logger.LogWarning("User not found: {UserId}", userId);
@@ -128,56 +135,101 @@ public class TenantMiddleware
             return null;
         }
 
+        // Create user context
+        return new UserContext
+        {
+            UserId = userId,
+            User = user
+        };
+    }
+
+    private async Task<TenantContext?> ResolveTenantContextAsync(HttpContext context, IUserRepository userRepository, UserContext userContext)
+    {
+        // Extract organization ID from X-Organization-ID header
+        var organizationIdHeader = context.Request.Headers["X-Organization-ID"].FirstOrDefault();
+        if (string.IsNullOrEmpty(organizationIdHeader) || !Guid.TryParse(organizationIdHeader, out var organizationId))
+        {
+            _logger.LogWarning("X-Organization-ID header not found or invalid for user {UserId}", userContext.UserId);
+            return null;
+        }
+
+        // Get user with organization membership
+        var user = await userRepository.GetByIdWithOrganizationsAsync(userContext.UserId);
+        if (user == null)
+        {
+            _logger.LogWarning("User not found: {UserId}", userContext.UserId);
+            return null;
+        }
+
         // Get user's membership in the organization
         var membership = user.GetOrganizationMembership(organizationId);
         if (membership == null)
         {
-            _logger.LogWarning("User {UserId} is not a member of organization {OrganizationId}", userId, organizationId);
+            _logger.LogWarning("User {UserId} is not a member of organization {OrganizationId}", userContext.UserId, organizationId);
             return null;
         }
 
         // Check if user is active in the organization
         if (!membership.IsActive)
         {
-            _logger.LogWarning("User {UserId} is not active in organization {OrganizationId}", userId, organizationId);
+            _logger.LogWarning("User {UserId} is not active in organization {OrganizationId}", userContext.UserId, organizationId);
             return null;
         }
 
         // Create tenant context
         return new TenantContext
         {
-            UserId = userId,
             OrganizationId = organizationId,
             UserRole = membership.Role,
-            User = user,
             Organization = membership.Organization,
             Membership = membership
         };
     }
 
-    private static bool IsPublicEndpoint(PathString path)
+    private static bool IsPublicEndpoint(HttpContext context)
     {
-        var pathValue = path.Value?.ToLowerInvariant() ?? string.Empty;
+        var endpoint = context.GetEndpoint();
+        if (endpoint == null) return false;
 
-        // Public endpoints that don't require authentication or tenant context
+        // Check for PublicEndpoint attribute on the endpoint
+        var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (publicAttribute != null) return true;
+
+        // Check for PublicEndpoint attribute on the controller
+        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (controllerAttribute != null) return true;
+
+        // Fallback: Check for specific paths that should always be public
+        var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
         return pathValue.StartsWith("/health") ||
                pathValue.StartsWith("/swagger") ||
-               pathValue.StartsWith("/api-docs") ||
-               pathValue.StartsWith("/auth/login") ||
-               pathValue.StartsWith("/auth/register") ||
-               pathValue.StartsWith("/auth/refresh") ||
-               pathValue.StartsWith("/auth/verify-email") ||
-               pathValue.StartsWith("/auth/reset-password") ||
-               pathValue.StartsWith("/auth/forgot-password");
+               pathValue.StartsWith("/api-docs");
     }
 
-    private static bool IsOrganizationAgnosticEndpoint(PathString path)
+    private static bool IsOrganizationAgnosticEndpoint(HttpContext context)
     {
-        var pathValue = path.Value?.ToLowerInvariant() ?? string.Empty;
+        var endpoint = context.GetEndpoint();
+        if (endpoint == null) return false;
 
-        // Endpoints that require authentication but don't need organization context
-        return pathValue.StartsWith("/auth/organizations"); // Organization discovery endpoint
+        // Check for OrganizationAgnostic attribute on the endpoint
+        var agnosticAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
+        if (agnosticAttribute != null) return true;
+
+        // Check for OrganizationAgnostic attribute on the controller
+        var controllerAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
+        if (controllerAttribute != null) return true;
+
+        return false;
     }
+}
+
+/// <summary>
+/// Context information for the current user (for organization-agnostic endpoints)
+/// </summary>
+public class UserContext
+{
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
 }
 
 /// <summary>
@@ -185,10 +237,8 @@ public class TenantMiddleware
 /// </summary>
 public class TenantContext
 {
-    public Guid UserId { get; set; }
     public Guid OrganizationId { get; set; }
     public UserRole UserRole { get; set; }
-    public User User { get; set; } = null!;
     public Organization Organization { get; set; } = null!;
     public UserOrganization Membership { get; set; } = null!;
 
@@ -221,9 +271,9 @@ public class TenantContext
 }
 
 /// <summary>
-/// Extension methods for accessing tenant context
+/// Extension methods for accessing context information
 /// </summary>
-public static class TenantContextExtensions
+public static class ContextExtensions
 {
     /// <summary>
     /// Get the current tenant context from HttpContext
@@ -236,19 +286,29 @@ public static class TenantContextExtensions
     }
 
     /// <summary>
+    /// Get the current user context from HttpContext (for organization-agnostic endpoints)
+    /// </summary>
+    public static UserContext? GetUserContext(this HttpContext context)
+    {
+        return context.Items.TryGetValue("UserContext", out var userContext)
+            ? userContext as UserContext
+            : null;
+    }
+
+    /// <summary>
+    /// Get the current user ID from HttpContext (works for both tenant and user contexts)
+    /// </summary>
+    public static Guid? GetUserId(this HttpContext context)
+    {
+        return context.GetUserContext()?.UserId;
+    }
+
+    /// <summary>
     /// Get the current organization ID from HttpContext
     /// </summary>
     public static Guid? GetOrganizationId(this HttpContext context)
     {
         return context.GetTenantContext()?.OrganizationId;
-    }
-
-    /// <summary>
-    /// Get the current user ID from HttpContext
-    /// </summary>
-    public static Guid? GetUserId(this HttpContext context)
-    {
-        return context.GetTenantContext()?.UserId;
     }
 
     /// <summary>

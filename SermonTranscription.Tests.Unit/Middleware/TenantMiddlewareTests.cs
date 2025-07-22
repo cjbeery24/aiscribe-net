@@ -61,50 +61,54 @@ public class TenantMiddlewareTests : BaseUnitTest
     public async Task InvokeAsync_ShouldResolveTenantContext_ForAuthenticatedRequests()
     {
         // Arrange
-        var userId = Guid.NewGuid();
         var organizationId = Guid.NewGuid();
-        var user = TestDataFactory.UserFaker.Generate();
-        user.Id = userId;
+        var (user, membership) = TestDataFactory.CreateUserWithOrganization(organizationId, UserRole.OrganizationAdmin);
 
         _httpContext.Request.Path = "/api/transcriptions";
         _httpContext.RequestServices = ServiceProvider;
-        _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationAdmin.ToString());
+        _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationAdmin.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _mockUserRepository
+            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task InvokeAsync_ShouldSetTenantContext_ForValidUser()
     {
         // Arrange
-        var userId = Guid.NewGuid();
         var organizationId = Guid.NewGuid();
-        var user = TestDataFactory.UserFaker.Generate();
-        user.Id = userId;
+        var (user, membership) = TestDataFactory.CreateUserWithOrganization(organizationId, UserRole.OrganizationUser);
 
         _httpContext.Request.Path = "/api/transcriptions";
         _httpContext.RequestServices = ServiceProvider;
-        _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationUser.ToString());
+        _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationUser.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _mockUserRepository
+            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

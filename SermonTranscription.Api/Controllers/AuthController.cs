@@ -32,6 +32,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Login credentials</param>
     /// <returns>Authentication tokens and user information</returns>
     [HttpPost("login")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -74,6 +75,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Registration information</param>
     /// <returns>Registration result</returns>
     [HttpPost("register")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
@@ -123,6 +125,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Refresh token request</param>
     /// <returns>New access token</returns>
     [HttpPost("refresh")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -246,6 +249,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Password reset request</param>
     /// <returns>Password reset request result</returns>
     [HttpPost("forgot-password")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
@@ -285,6 +289,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Password reset request</param>
     /// <returns>Password reset result</returns>
     [HttpPost("reset-password")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -334,10 +339,19 @@ public class AuthController : ControllerBase
     {
         try
         {
-            // Get tenant context from middleware (already validated)
+            // Get tenant context and user ID from middleware (already validated)
             var tenantContext = HttpContext.GetTenantContext()!;
+            var userId = HttpContext.GetUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized(new ErrorResponse
+                {
+                    Message = "User not authenticated",
+                    Errors = ["User ID not found in context"]
+                });
+            }
 
-            var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, tenantContext.UserId);
+            var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, userId.Value);
 
             if (!result.Success)
             {
@@ -367,6 +381,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Invitation acceptance request</param>
     /// <returns>Acceptance result with authentication tokens</returns>
     [HttpPost("accept-invitation")]
+    [PublicEndpoint]
     [ProducesResponseType(typeof(AcceptInvitationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -404,15 +419,16 @@ public class AuthController : ControllerBase
     /// <returns>List of organizations the user is a member of</returns>
     [HttpGet("organizations")]
     [Authorize]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(List<OrganizationSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetUserOrganizations()
     {
         try
         {
-            // Get user ID from JWT claims (not tenant context, since this endpoint is organization-agnostic)
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            // Get user ID from context (middleware validates and provides this)
+            var userId = HttpContext.GetUserId();
+            if (!userId.HasValue)
             {
                 return Unauthorized(new ErrorResponse
                 {
@@ -422,7 +438,7 @@ public class AuthController : ControllerBase
             }
 
             // Get user's organizations from the service
-            var organizations = await _authService.GetUserOrganizationsAsync(userId);
+            var organizations = await _authService.GetUserOrganizationsAsync(userId.Value);
 
             return Ok(organizations);
         }

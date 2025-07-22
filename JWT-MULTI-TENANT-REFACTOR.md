@@ -59,16 +59,66 @@ This document describes the refactored JWT and multi-tenant authorization approa
 
 ### Tenant Middleware
 
-- Extracts organization ID from `X-Organization-ID` header
-- Verifies user membership in the specified organization
-- Checks if user is active in the organization
-- Creates `TenantContext` with user, organization, and role information
-- Stores context in `HttpContext.Items["TenantContext"]`
+- **Always resolves user context** for authenticated requests (validates user and stores in `HttpContext.Items["UserContext"]`)
+- **Extracts organization ID** from `X-Organization-ID` header for tenant-specific endpoints
+- **Verifies user membership** in the specified organization
+- **Checks if user is active** in the organization
+- **Creates `TenantContext`** with organization and role information (user info comes from `UserContext`)
+- **Stores tenant context** in `HttpContext.Items["TenantContext"]`
 - **Returns 403 Forbidden** if tenant context cannot be resolved (prevents requests from reaching controllers)
-- **Handles three types of endpoints:**
-  - **Public endpoints** (no auth, no tenant): login, register, health checks, etc.
-  - **Organization-agnostic endpoints** (auth required, no tenant): `/auth/organizations`
-  - **Organization-specific endpoints** (auth + tenant required): all other protected endpoints
+- **Uses attribute-based endpoint classification** for better maintainability
+
+### Context Design
+
+The middleware now uses a two-tier context approach:
+
+1. **`UserContext`** - Always available for authenticated requests
+
+   - Contains `UserId` and `User` entity
+   - Validates user authentication and active status
+   - Available via `HttpContext.GetUserId()` and `HttpContext.GetUserContext()`
+
+2. **`TenantContext`** - Only for organization-specific endpoints
+   - Contains `OrganizationId`, `UserRole`, `Organization`, and `Membership`
+   - Validates organization membership and role
+   - Available via `HttpContext.GetTenantContext()`
+   - Requires `X-Organization-ID` header
+
+### Endpoint Classification with Attributes
+
+The middleware uses custom attributes to classify endpoints, eliminating the need for hardcoded path lists:
+
+#### `[PublicEndpoint]` Attribute
+
+Marks endpoints that don't require authentication or tenant context:
+
+```csharp
+[HttpPost("login")]
+[PublicEndpoint]
+public async Task<IActionResult> Login([FromBody] LoginRequest request)
+```
+
+#### `[OrganizationAgnostic]` Attribute
+
+Marks endpoints that require authentication but no tenant context:
+
+```csharp
+[HttpGet("organizations")]
+[Authorize]
+[OrganizationAgnostic]
+public async Task<IActionResult> GetUserOrganizations()
+```
+
+#### Default Behavior
+
+Endpoints without special attributes require both authentication and tenant context.
+
+**Benefits:**
+
+- **Declarative**: Endpoint behavior is clearly marked in the controller
+- **Maintainable**: No need to update middleware when adding new endpoints
+- **Type-safe**: Compile-time checking of attribute usage
+- **Self-documenting**: Code clearly shows endpoint requirements
 
 ### Authorization System
 
