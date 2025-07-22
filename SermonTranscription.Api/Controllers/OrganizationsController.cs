@@ -62,7 +62,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Get organization by ID
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Organization details</returns>
     [HttpGet("load")]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
@@ -87,7 +86,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Update organization details
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <param name="request">Update request</param>
     /// <returns>Updated organization details</returns>
     [HttpPut]
@@ -117,7 +115,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Update organization settings
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <param name="request">Settings update request</param>
     /// <returns>Updated organization details</returns>
     [HttpPut("settings")]
@@ -147,7 +144,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Update organization logo
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <param name="request">Logo update request</param>
     /// <returns>Updated organization details</returns>
     [HttpPut("logo")]
@@ -177,7 +173,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Delete organization
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Deletion confirmation</returns>
     [HttpDelete]
     [RequireOrganizationAdmin]
@@ -203,7 +198,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Activate organization
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Activation confirmation</returns>
     [HttpPost("activate")]
     [RequireOrganizationAdmin]
@@ -229,7 +223,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Deactivate organization
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Deactivation confirmation</returns>
     [HttpPost("deactivate")]
     [RequireOrganizationAdmin]
@@ -255,11 +248,10 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Get organization with users
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Organization details with user information</returns>
     [HttpGet("users")]
     [RequireCanManageUsers]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(OrganizationWithUsersResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -280,11 +272,10 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <summary>
     /// Get organization with subscriptions
     /// </summary>
-    /// <param name="id">Organization ID</param>
     /// <returns>Organization details with subscription information</returns>
     [HttpGet("subscriptions")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(OrganizationWithSubscriptionsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

@@ -434,43 +434,43 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationWithUsersAsync(Guid organizationId)
+    public async Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId)
     {
         try
         {
             var organization = await _organizationRepository.GetWithUserOrganizationsAsync(organizationId);
             if (organization == null)
             {
-                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+                return ServiceResult<OrganizationWithUsersResponse>.Failure("Organization not found");
             }
 
-            var response = MapToOrganizationResponse(organization);
-            return ServiceResult<OrganizationResponse>.Success(response);
+            var response = MapToOrganizationWithUsersResponse(organization);
+            return ServiceResult<OrganizationWithUsersResponse>.Success(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving organization with users {OrganizationId}", organizationId);
-            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+            return ServiceResult<OrganizationWithUsersResponse>.Failure("An error occurred while retrieving the organization");
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId)
+    public async Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId)
     {
         try
         {
             var organization = await _organizationRepository.GetWithSubscriptionsAsync(organizationId);
             if (organization == null)
             {
-                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+                return ServiceResult<OrganizationWithSubscriptionsResponse>.Failure("Organization not found");
             }
 
-            var response = MapToOrganizationResponse(organization);
-            return ServiceResult<OrganizationResponse>.Success(response);
+            var response = MapToOrganizationWithSubscriptionsResponse(organization);
+            return ServiceResult<OrganizationWithSubscriptionsResponse>.Success(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving organization with subscriptions {OrganizationId}", organizationId);
-            return ServiceResult<OrganizationResponse>.Failure("An error occurred while retrieving the organization");
+            return ServiceResult<OrganizationWithSubscriptionsResponse>.Failure("An error occurred while retrieving the organization");
         }
     }
 
@@ -507,6 +507,158 @@ public class OrganizationService : IOrganizationService
             CanCreateTranscription = organization.CanCreateTranscription(),
             HasRealtimeTranscriptionEnabled = organization.HasRealtimeTranscriptionEnabled(),
             CanExportTranscriptionsEnabled = organization.CanExportTranscriptionsEnabled()
+        };
+    }
+
+    private static OrganizationWithUsersResponse MapToOrganizationWithUsersResponse(Organization organization)
+    {
+        var baseResponse = MapToOrganizationResponse(organization);
+
+        var response = new OrganizationWithUsersResponse
+        {
+            // Copy all properties from base response
+            Id = baseResponse.Id,
+            Name = baseResponse.Name,
+            Slug = baseResponse.Slug,
+            Description = baseResponse.Description,
+            ContactEmail = baseResponse.ContactEmail,
+            PhoneNumber = baseResponse.PhoneNumber,
+            Address = baseResponse.Address,
+            City = baseResponse.City,
+            State = baseResponse.State,
+            PostalCode = baseResponse.PostalCode,
+            Country = baseResponse.Country,
+            LogoUrl = baseResponse.LogoUrl,
+            WebsiteUrl = baseResponse.WebsiteUrl,
+            CreatedAt = baseResponse.CreatedAt,
+            UpdatedAt = baseResponse.UpdatedAt,
+            IsActive = baseResponse.IsActive,
+            MaxUsers = baseResponse.MaxUsers,
+            MaxTranscriptionHours = baseResponse.MaxTranscriptionHours,
+            CanExportTranscriptions = baseResponse.CanExportTranscriptions,
+            HasRealtimeTranscription = baseResponse.HasRealtimeTranscription,
+            DisplayName = baseResponse.DisplayName,
+            FullAddress = baseResponse.FullAddress,
+            HasCompleteContactInfo = baseResponse.HasCompleteContactInfo,
+            HasActiveSubscription = baseResponse.HasActiveSubscription,
+            ActiveUserCount = baseResponse.ActiveUserCount,
+            CanAddMoreUsers = baseResponse.CanAddMoreUsers,
+            CanCreateTranscription = baseResponse.CanCreateTranscription,
+            HasRealtimeTranscriptionEnabled = baseResponse.HasRealtimeTranscriptionEnabled,
+            CanExportTranscriptionsEnabled = baseResponse.CanExportTranscriptionsEnabled,
+
+            // Add user information
+            Users = organization.UserOrganizations
+                .Where(uo => uo.IsActive)
+                .Select(uo => new OrganizationUserResponse
+                {
+                    UserId = uo.User.Id,
+                    Email = uo.User.Email,
+                    FirstName = uo.User.FirstName,
+                    LastName = uo.User.LastName,
+                    Role = uo.Role.ToString(),
+                    IsActive = uo.IsActive,
+                    JoinedAt = uo.CreatedAt,
+                    LastLoginAt = uo.User.LastLoginAt,
+                    IsEmailVerified = uo.User.IsEmailVerified,
+                    FullName = uo.User.FullName,
+                    CanManageUsers = uo.CanManageUsers(),
+                    CanManageTranscriptions = uo.CanManageTranscriptions(),
+                    CanViewTranscriptions = uo.CanViewTranscriptions(),
+                    CanExportTranscriptions = uo.CanExportTranscriptions()
+                })
+                .ToList()
+        };
+
+        return response;
+    }
+
+    private static OrganizationWithSubscriptionsResponse MapToOrganizationWithSubscriptionsResponse(Organization organization)
+    {
+        var baseResponse = MapToOrganizationResponse(organization);
+
+        var response = new OrganizationWithSubscriptionsResponse
+        {
+            // Copy all properties from base response
+            Id = baseResponse.Id,
+            Name = baseResponse.Name,
+            Slug = baseResponse.Slug,
+            Description = baseResponse.Description,
+            ContactEmail = baseResponse.ContactEmail,
+            PhoneNumber = baseResponse.PhoneNumber,
+            Address = baseResponse.Address,
+            City = baseResponse.City,
+            State = baseResponse.State,
+            PostalCode = baseResponse.PostalCode,
+            Country = baseResponse.Country,
+            LogoUrl = baseResponse.LogoUrl,
+            WebsiteUrl = baseResponse.WebsiteUrl,
+            CreatedAt = baseResponse.CreatedAt,
+            UpdatedAt = baseResponse.UpdatedAt,
+            IsActive = baseResponse.IsActive,
+            MaxUsers = baseResponse.MaxUsers,
+            MaxTranscriptionHours = baseResponse.MaxTranscriptionHours,
+            CanExportTranscriptions = baseResponse.CanExportTranscriptions,
+            HasRealtimeTranscription = baseResponse.HasRealtimeTranscription,
+            DisplayName = baseResponse.DisplayName,
+            FullAddress = baseResponse.FullAddress,
+            HasCompleteContactInfo = baseResponse.HasCompleteContactInfo,
+            HasActiveSubscription = baseResponse.HasActiveSubscription,
+            ActiveUserCount = baseResponse.ActiveUserCount,
+            CanAddMoreUsers = baseResponse.CanAddMoreUsers,
+            CanCreateTranscription = baseResponse.CanCreateTranscription,
+            HasRealtimeTranscriptionEnabled = baseResponse.HasRealtimeTranscriptionEnabled,
+            CanExportTranscriptionsEnabled = baseResponse.CanExportTranscriptionsEnabled,
+
+            // Add subscription information
+            Subscriptions = organization.Subscriptions
+                .Select(MapToSubscriptionResponse)
+                .ToList(),
+
+            // Set active subscription
+            ActiveSubscription = organization.Subscriptions
+                .FirstOrDefault(s => s.IsActive) is Subscription activeSub
+                ? MapToSubscriptionResponse(activeSub)
+                : null
+        };
+
+        return response;
+    }
+
+    private static SubscriptionResponse MapToSubscriptionResponse(Domain.Entities.Subscription subscription)
+    {
+        return new SubscriptionResponse
+        {
+            Id = subscription.Id,
+            Plan = subscription.Plan,
+            Status = subscription.Status,
+            StartDate = subscription.StartDate,
+            EndDate = subscription.EndDate,
+            CancelledAt = subscription.CancelledAt,
+            CreatedAt = subscription.CreatedAt,
+            UpdatedAt = subscription.UpdatedAt,
+            MonthlyPrice = subscription.MonthlyPrice,
+            YearlyPrice = subscription.YearlyPrice,
+            Currency = subscription.Currency,
+            NextBillingDate = subscription.NextBillingDate,
+            LastBillingDate = subscription.LastBillingDate,
+            StripeSubscriptionId = subscription.StripeSubscriptionId,
+            StripeCustomerId = subscription.StripeCustomerId,
+            StripePriceId = subscription.StripePriceId,
+            MaxUsers = subscription.MaxUsers,
+            MaxTranscriptionHours = subscription.MaxTranscriptionHours,
+            CanExportTranscriptions = subscription.CanExportTranscriptions,
+            HasRealtimeTranscription = subscription.HasRealtimeTranscription,
+            HasPrioritySupport = subscription.HasPrioritySupport,
+            CurrentUsers = subscription.CurrentUsers,
+            TranscriptionHoursUsed = subscription.TranscriptionHoursUsed,
+            UsageResetDate = subscription.UsageResetDate,
+            IsActive = subscription.IsActive,
+            IsExpired = subscription.IsExpired,
+            IsCancelled = subscription.IsCancelled,
+            RemainingUsers = subscription.RemainingUsers,
+            RemainingTranscriptionHours = subscription.RemainingTranscriptionHours,
+            PlanName = subscription.Plan.ToString()
         };
     }
 

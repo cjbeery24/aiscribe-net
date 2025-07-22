@@ -1,20 +1,14 @@
 using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application;
 using SermonTranscription.Infrastructure;
 using Serilog;
-using Serilog.Events;
-using System.Security.Claims;
 using System.Text;
-using System.Text.Encodings.Web;
 
 // Create initial configuration to read Serilog settings
 var configuration = new ConfigurationBuilder()
@@ -80,6 +74,27 @@ try
             new()
             {
                 Reference = new() { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            new string[] {}
+        }
+        });
+
+        // Add X-Organization-ID header parameter for all operations
+        c.AddSecurityDefinition("X-Organization-ID", new()
+        {
+            Description = "Organization ID header for multi-tenant requests. Required for most endpoints that operate within an organization context.",
+            Name = "X-Organization-ID",
+            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
+        });
+
+        // Add global parameter for X-Organization-ID
+        c.AddSecurityRequirement(new()
+        {
+        {
+            new()
+            {
+                Reference = new() { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "X-Organization-ID" }
             },
             new string[] {}
         }

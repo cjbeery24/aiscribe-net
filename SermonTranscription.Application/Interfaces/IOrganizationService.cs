@@ -18,6 +18,6 @@ public interface IOrganizationService
     Task<ServiceResult> DeleteOrganizationAsync(Guid organizationId);
     Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId);
     Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId);
-    Task<ServiceResult<OrganizationResponse>> GetOrganizationWithUsersAsync(Guid organizationId);
-    Task<ServiceResult<OrganizationResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId);
+    Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId);
+    Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId);
 }
