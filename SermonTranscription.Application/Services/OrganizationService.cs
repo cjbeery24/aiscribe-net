@@ -70,6 +70,12 @@ public class OrganizationService : IOrganizationService
             // Generate slug
             organization.UpdateSlug();
 
+            // Check if slug already exists
+            if (await _organizationRepository.SlugExistsAsync(organization.Slug!))
+            {
+                return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists");
+            }
+
             // Save organization
             await _organizationRepository.AddAsync(organization);
 
@@ -134,21 +140,32 @@ public class OrganizationService : IOrganizationService
             if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 10;
 
             // Get organizations based on search criteria
-            var organizations = await _organizationRepository.GetAllAsync();
+            IEnumerable<Organization> organizations;
 
-            // Apply filters
-            var filteredOrganizations = organizations.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+            // Optimize based on filters
+            if (request.IsActive == true)
             {
-                filteredOrganizations = filteredOrganizations.Where(o =>
-                    o.Name.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    (o.Description != null && o.Description.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase)));
+                // Use repository method for active organizations
+                organizations = await _organizationRepository.GetActiveOrganizationsAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+            {
+                // Use repository method for name search
+                organizations = await _organizationRepository.SearchByNameAsync(request.SearchTerm);
+            }
+            else
+            {
+                // Get all organizations
+                organizations = await _organizationRepository.GetAllAsync();
             }
 
-            if (request.IsActive.HasValue)
+            // Apply additional filters that can't be done at database level
+            var filteredOrganizations = organizations.AsEnumerable();
+
+            if (request.IsActive.HasValue && request.IsActive.Value == false)
             {
-                filteredOrganizations = filteredOrganizations.Where(o => o.IsActive == request.IsActive.Value);
+                // Filter for inactive organizations (since we already have active ones from repository)
+                filteredOrganizations = filteredOrganizations.Where(o => !o.IsActive);
             }
 
             if (request.HasActiveSubscription.HasValue)
@@ -220,6 +237,12 @@ public class OrganizationService : IOrganizationService
 
                 organization.Name = request.Name;
                 organization.UpdateSlug();
+
+                // Check if new slug conflicts with existing organization
+                if (await _organizationRepository.SlugExistsAsync(organization.Slug!))
+                {
+                    return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists");
+                }
             }
 
             if (request.Description != null)
