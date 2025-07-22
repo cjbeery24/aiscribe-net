@@ -73,15 +73,7 @@ public class RequireCanExportTranscriptionsAttribute : AuthorizeAttribute
     }
 }
 
-/// <summary>
-/// Authorization attribute for organization members (any active member)
-/// </summary>
-public class RequireOrganizationMemberAttribute : AuthorizeAttribute
-{
-    public RequireOrganizationMemberAttribute() : base(AuthorizationPolicies.OrganizationMember)
-    {
-    }
-}
+
 
 /// <summary>
 /// Authorization attribute for authenticated users (any valid JWT token)
@@ -91,4 +83,4 @@ public class RequireAuthenticatedUserAttribute : AuthorizeAttribute
     public RequireAuthenticatedUserAttribute() : base(AuthorizationPolicies.AuthenticatedUser)
     {
     }
-} 
+}

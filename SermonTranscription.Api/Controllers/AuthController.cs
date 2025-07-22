@@ -10,20 +10,18 @@ namespace SermonTranscription.Api.Controllers;
 /// <summary>
 /// Authentication controller for user login, registration, and token management
 /// </summary>
-[ApiController]
 [Route("api/v{version:apiVersion}/auth")]
 [ApiVersion("1.0")]
-public class AuthController : ControllerBase
+public class AuthController : BaseApiController
 {
     private readonly IAuthService _authService;
     private readonly InvitationService _invitationService;
-    private readonly ILogger<AuthController> _logger;
 
     public AuthController(IAuthService authService, InvitationService invitationService, ILogger<AuthController> logger)
+        : base(logger)
     {
         _authService = authService;
         _invitationService = invitationService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -133,6 +131,10 @@ public class AuthController : ControllerBase
     {
         try
         {
+            // Validate request using base controller method
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _authService.RefreshTokenAsync(request.RefreshToken);
 
             if (!result.IsSuccess)
@@ -161,51 +163,7 @@ public class AuthController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Validate access token
-    /// </summary>
-    /// <returns>User information if token is valid</returns>
-    [HttpPost("validate")]
-    [Authorize]
-    [ProducesResponseType(typeof(AuthUserInfo), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> ValidateToken()
-    {
-        try
-        {
-            var token = Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
-            if (string.IsNullOrEmpty(token))
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "No token provided",
-                    Errors = new[] { "Authorization header is required" }
-                });
-            }
 
-            var result = await _authService.ValidateTokenAsync(token);
-
-            if (!result.IsSuccess)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = result.Message,
-                    Errors = new[] { result.Message }
-                });
-            }
-
-            return Ok(result.User);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during token validation");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred during token validation",
-                Errors = ["Internal server error"]
-            });
-        }
-    }
 
     /// <summary>
     /// Logout endpoint - revokes all refresh tokens for the current user
@@ -213,6 +171,7 @@ public class AuthController : ControllerBase
     /// <returns>Logout confirmation</returns>
     [HttpPost("logout")]
     [Authorize]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout()
@@ -330,7 +289,8 @@ public class AuthController : ControllerBase
     /// <param name="request">Invitation request</param>
     /// <returns>Invitation result</returns>
     [HttpPost("invite")]
-    [Authorize(AuthorizationPolicies.CanManageUsers)]
+    [Authorize]
+    [RequireCanManageUsers]
     [ProducesResponseType(typeof(InviteUserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -341,17 +301,9 @@ public class AuthController : ControllerBase
         {
             // Get tenant context and user ID from middleware (already validated)
             var tenantContext = HttpContext.GetTenantContext()!;
-            var userId = HttpContext.GetUserId();
-            if (!userId.HasValue)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "User not authenticated",
-                    Errors = ["User ID not found in context"]
-                });
-            }
+            var userId = HttpContext.GetUserId()!.Value;
 
-            var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, userId.Value);
+            var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, userId);
 
             if (!result.Success)
             {
@@ -427,18 +379,10 @@ public class AuthController : ControllerBase
         try
         {
             // Get user ID from context (middleware validates and provides this)
-            var userId = HttpContext.GetUserId();
-            if (!userId.HasValue)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "Invalid user token",
-                    Errors = ["User not authenticated"]
-                });
-            }
+            var userId = HttpContext.GetUserId()!.Value;
 
             // Get user's organizations from the service
-            var organizations = await _authService.GetUserOrganizationsAsync(userId.Value);
+            var organizations = await _authService.GetUserOrganizationsAsync(userId);
 
             return Ok(organizations);
         }

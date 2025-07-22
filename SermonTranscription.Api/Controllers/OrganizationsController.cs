@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Api.Authorization;
+using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Application.Interfaces;
@@ -12,7 +13,7 @@ namespace SermonTranscription.Api.Controllers;
 /// </summary>
 [Route("api/v{version:apiVersion}/organizations")]
 [ApiVersion("1.0")]
-public class OrganizationsController : BaseApiController
+public class OrganizationsController : BaseAuthenticatedApiController
 {
     private readonly IOrganizationService _organizationService;
 
@@ -28,7 +29,7 @@ public class OrganizationsController : BaseApiController
     /// <param name="request">Organization creation request</param>
     /// <returns>Created organization details</returns>
     [HttpPost]
-    [RequireAuthenticatedUser]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -50,7 +51,7 @@ public class OrganizationsController : BaseApiController
             }
 
             var result = await _organizationService.CreateOrganizationAsync(request, userId.Value);
-            return HandleServiceResult(result, () => CreatedAtAction(nameof(GetOrganization), new { id = result.Data!.Id }, result.Data));
+            return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
@@ -63,71 +64,25 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Organization details</returns>
-    [HttpGet("{id:guid}")]
-    [RequireOrganizationMember]
+    [HttpGet("load")]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganization(Guid id)
+    public async Task<IActionResult> LoadOrganization()
     {
         try
         {
-            var result = await _organizationService.GetOrganizationAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId);
             return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error retrieving organization {id}");
+            return HandleException(ex, $"Error retrieving organization");
         }
     }
 
-    /// <summary>
-    /// Get organization by slug
-    /// </summary>
-    /// <param name="slug">Organization slug</param>
-    /// <returns>Organization details</returns>
-    [HttpGet("slug/{slug}")]
-    [RequireOrganizationMember]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganizationBySlug(string slug)
-    {
-        try
-        {
-            var result = await _organizationService.GetOrganizationBySlugAsync(slug);
-            return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error retrieving organization by slug {slug}");
-        }
-    }
-
-    /// <summary>
-    /// Get organizations with search and pagination
-    /// </summary>
-    /// <param name="request">Search and pagination parameters</param>
-    /// <returns>Paginated list of organizations</returns>
-    [HttpGet]
-    [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationListResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetOrganizations([FromQuery] OrganizationSearchRequest request)
-    {
-        try
-        {
-            var result = await _organizationService.GetOrganizationsAsync(request);
-            return HandleServiceResult<OrganizationListResponse>(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, "Error retrieving organizations");
-        }
-    }
 
     /// <summary>
     /// Update organization details
@@ -135,26 +90,27 @@ public class OrganizationsController : BaseApiController
     /// <param name="id">Organization ID</param>
     /// <param name="request">Update request</param>
     /// <returns>Updated organization details</returns>
-    [HttpPut("{id:guid}")]
+    [HttpPut]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateOrganization(Guid id, [FromBody] UpdateOrganizationRequest request)
+    public async Task<IActionResult> UpdateOrganization([FromBody] UpdateOrganizationRequest request)
     {
         try
         {
             var validationResult = ValidateModelState();
             if (validationResult != null) return validationResult;
 
-            var result = await _organizationService.UpdateOrganizationAsync(id, request);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error updating organization {id}");
+            return HandleException(ex, $"Error updating organization");
         }
     }
 
@@ -164,26 +120,27 @@ public class OrganizationsController : BaseApiController
     /// <param name="id">Organization ID</param>
     /// <param name="request">Settings update request</param>
     /// <returns>Updated organization details</returns>
-    [HttpPut("{id:guid}/settings")]
+    [HttpPut("settings")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateOrganizationSettings(Guid id, [FromBody] UpdateOrganizationSettingsRequest request)
+    public async Task<IActionResult> UpdateOrganizationSettings([FromBody] UpdateOrganizationSettingsRequest request)
     {
         try
         {
             var validationResult = ValidateModelState();
             if (validationResult != null) return validationResult;
 
-            var result = await _organizationService.UpdateOrganizationSettingsAsync(id, request);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error updating organization settings {id}");
+            return HandleException(ex, $"Error updating organization settings");
         }
     }
 
@@ -193,26 +150,27 @@ public class OrganizationsController : BaseApiController
     /// <param name="id">Organization ID</param>
     /// <param name="request">Logo update request</param>
     /// <returns>Updated organization details</returns>
-    [HttpPut("{id:guid}/logo")]
+    [HttpPut("logo")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateOrganizationLogo(Guid id, [FromBody] UpdateOrganizationLogoRequest request)
+    public async Task<IActionResult> UpdateOrganizationLogo([FromBody] UpdateOrganizationLogoRequest request)
     {
         try
         {
             var validationResult = ValidateModelState();
             if (validationResult != null) return validationResult;
 
-            var result = await _organizationService.UpdateOrganizationLogoAsync(id, request);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error updating organization logo {id}");
+            return HandleException(ex, $"Error updating organization logo");
         }
     }
 
@@ -221,23 +179,24 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Deletion confirmation</returns>
-    [HttpDelete("{id:guid}")]
+    [HttpDelete]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteOrganization(Guid id)
+    public async Task<IActionResult> DeleteOrganization()
     {
         try
         {
-            var result = await _organizationService.DeleteOrganizationAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.DeleteOrganizationAsync(tenantContext.OrganizationId);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error deleting organization {id}");
+            return HandleException(ex, $"Error deleting organization");
         }
     }
 
@@ -246,23 +205,24 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Activation confirmation</returns>
-    [HttpPost("{id:guid}/activate")]
+    [HttpPost("activate")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ActivateOrganization(Guid id)
+    public async Task<IActionResult> ActivateOrganization()
     {
         try
         {
-            var result = await _organizationService.ActivateOrganizationAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.ActivateOrganizationAsync(tenantContext.OrganizationId);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error activating organization {id}");
+            return HandleException(ex, $"Error activating organization");
         }
     }
 
@@ -271,23 +231,24 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Deactivation confirmation</returns>
-    [HttpPost("{id:guid}/deactivate")]
+    [HttpPost("deactivate")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeactivateOrganization(Guid id)
+    public async Task<IActionResult> DeactivateOrganization()
     {
         try
         {
-            var result = await _organizationService.DeactivateOrganizationAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.DeactivateOrganizationAsync(tenantContext.OrganizationId);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error deactivating organization {id}");
+            return HandleException(ex, $"Error deactivating organization");
         }
     }
 
@@ -296,22 +257,23 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Organization details with user information</returns>
-    [HttpGet("{id:guid}/users")]
+    [HttpGet("users")]
     [RequireCanManageUsers]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganizationWithUsers(Guid id)
+    public async Task<IActionResult> GetOrganizationWithUsers()
     {
         try
         {
-            var result = await _organizationService.GetOrganizationWithUsersAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error retrieving organization with users {id}");
+            return HandleException(ex, $"Error retrieving organization with users");
         }
     }
 
@@ -320,22 +282,23 @@ public class OrganizationsController : BaseApiController
     /// </summary>
     /// <param name="id">Organization ID</param>
     /// <returns>Organization details with subscription information</returns>
-    [HttpGet("{id:guid}/subscriptions")]
+    [HttpGet("subscriptions")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganizationWithSubscriptions(Guid id)
+    public async Task<IActionResult> GetOrganizationWithSubscriptions()
     {
         try
         {
-            var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(id);
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
         {
-            return HandleException(ex, $"Error retrieving organization with subscriptions {id}");
+            return HandleException(ex, $"Error retrieving organization with subscriptions");
         }
     }
 }

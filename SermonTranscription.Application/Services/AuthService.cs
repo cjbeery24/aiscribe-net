@@ -315,42 +315,7 @@ public class AuthService : IAuthService
         return refreshToken;
     }
 
-    public async Task<AuthResult> ValidateTokenAsync(string token)
-    {
-        try
-        {
-            var userInfo = await _jwtService.ValidateTokenAsync(token);
-            if (userInfo == null)
-            {
-                return AuthResult.Failure("Invalid or expired token");
-            }
 
-            // Check if user still exists and is active
-            var user = await _userRepository.GetByIdAsync(userInfo.UserId);
-            if (user == null || !user.IsActive)
-            {
-                return AuthResult.Failure("User account is no longer valid");
-            }
-
-            // Note: With the new approach, organization context is determined by X-Organization-ID header
-            // This method only validates that the user exists and is active
-            // Organization membership and role are checked in the TenantMiddleware
-
-            return AuthResult.Success(new AuthUserInfo
-            {
-                UserId = userInfo.UserId,
-                Email = userInfo.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName
-                // OrganizationId and Role are no longer included as they're determined per-request
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating token");
-            return AuthResult.Failure("An error occurred during token validation");
-        }
-    }
 
     public async Task<AuthResult> ForgotPasswordAsync(string email)
     {
@@ -505,7 +470,6 @@ public interface IAuthService
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
     Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken);
     Task<AuthResult> RevokeAllUserRefreshTokensAsync(Guid userId);
-    Task<AuthResult> ValidateTokenAsync(string token);
     Task<AuthResult> ForgotPasswordAsync(string email);
     Task<AuthResult> ResetPasswordAsync(string token, string newPassword);
     Task<List<OrganizationSummaryDto>> GetUserOrganizationsAsync(Guid userId);

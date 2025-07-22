@@ -107,3 +107,27 @@ public class UserContext
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 }
+
+/// <summary>
+/// Extension methods for accessing user context information
+/// </summary>
+public static class UserContextExtensions
+{
+    /// <summary>
+    /// Get the current user context from HttpContext (for organization-agnostic endpoints)
+    /// </summary>
+    public static UserContext? GetUserContext(this HttpContext context)
+    {
+        return context.Items.TryGetValue("UserContext", out var userContext)
+            ? userContext as UserContext
+            : null;
+    }
+
+    /// <summary>
+    /// Get the current user ID from HttpContext (works for both tenant and user contexts)
+    /// </summary>
+    public static Guid? GetUserId(this HttpContext context)
+    {
+        return context.GetUserContext()?.UserId;
+    }
+}

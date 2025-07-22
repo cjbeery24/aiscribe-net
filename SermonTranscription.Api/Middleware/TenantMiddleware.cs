@@ -161,9 +161,9 @@ public class TenantContext
 }
 
 /// <summary>
-/// Extension methods for accessing context information
+/// Extension methods for accessing tenant context information
 /// </summary>
-public static class ContextExtensions
+public static class TenantContextExtensions
 {
     /// <summary>
     /// Get the current tenant context from HttpContext
@@ -173,24 +173,6 @@ public static class ContextExtensions
         return context.Items.TryGetValue("TenantContext", out var tenantContext)
             ? tenantContext as TenantContext
             : null;
-    }
-
-    /// <summary>
-    /// Get the current user context from HttpContext (for organization-agnostic endpoints)
-    /// </summary>
-    public static UserContext? GetUserContext(this HttpContext context)
-    {
-        return context.Items.TryGetValue("UserContext", out var userContext)
-            ? userContext as UserContext
-            : null;
-    }
-
-    /// <summary>
-    /// Get the current user ID from HttpContext (works for both tenant and user contexts)
-    /// </summary>
-    public static Guid? GetUserId(this HttpContext context)
-    {
-        return context.GetUserContext()?.UserId;
     }
 
     /// <summary>

@@ -176,16 +176,15 @@ try
                    .RequireAssertion(context => context.Resource is HttpContext httpContext &&
                                                httpContext.CanExportTranscriptions()));
 
-        // Organization Member Policy - any active member (validated by TenantMiddleware)
-        options.AddPolicy(AuthorizationPolicies.OrganizationMember, policy =>
-            policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.GetTenantContext() != null));
+
+
+
 
         // Authenticated User Policy - any valid JWT token
         options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
             policy.RequireAuthenticatedUser());
     });
+    builder.Services.AddHttpContextAccessor();
 
     // API Versioning
     builder.Services.AddApiVersioning(opt =>
