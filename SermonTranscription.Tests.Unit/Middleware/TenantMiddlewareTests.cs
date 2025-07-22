@@ -69,9 +69,10 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationAdmin.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
-        _mockUserRepository
-            .Setup(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        // Simulate UserContext being set by AuthenticationMiddleware
+        var userContext = new UserContext { UserId = user.Id, User = user };
+        _httpContext.Items["UserContext"] = userContext;
+
         _mockUserRepository
             .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
@@ -80,7 +81,6 @@ public class TenantMiddlewareTests : BaseUnitTest
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -96,9 +96,10 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationUser.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
-        _mockUserRepository
-            .Setup(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        // Simulate UserContext being set by AuthenticationMiddleware
+        var userContext = new UserContext { UserId = user.Id, User = user };
+        _httpContext.Items["UserContext"] = userContext;
+
         _mockUserRepository
             .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
@@ -107,7 +108,6 @@ public class TenantMiddlewareTests : BaseUnitTest
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 

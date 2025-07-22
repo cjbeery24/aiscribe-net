@@ -82,7 +82,7 @@ public class OrganizationEnhancedTests : BaseUnitTest
         activeSubscription.Status = Domain.Enums.SubscriptionStatus.Active;
         var cancelledSubscription = TestDataFactory.SubscriptionFaker.Generate();
         cancelledSubscription.Status = Domain.Enums.SubscriptionStatus.Cancelled;
-        
+
         organization.Subscriptions.Add(activeSubscription);
         organization.Subscriptions.Add(cancelledSubscription);
 
@@ -104,7 +104,7 @@ public class OrganizationEnhancedTests : BaseUnitTest
         activeUser2.IsActive = true;
         var inactiveUser = TestDataFactory.UserFaker.Generate();
         inactiveUser.IsActive = false;
-        
+
         // Create UserOrganization entities and add them to the organization
         var userOrg1 = new UserOrganization
         {
@@ -130,7 +130,7 @@ public class OrganizationEnhancedTests : BaseUnitTest
             IsActive = false,
             CreatedAt = DateTime.UtcNow
         };
-        
+
         organization.UserOrganizations.Add(userOrg1);
         organization.UserOrganizations.Add(userOrg2);
         organization.UserOrganizations.Add(userOrg3);
@@ -162,12 +162,12 @@ public class OrganizationEnhancedTests : BaseUnitTest
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
         organization.MaxUsers = 2;
-        
+
         var user1 = TestDataFactory.UserFaker.Generate();
         user1.IsActive = true;
         var user2 = TestDataFactory.UserFaker.Generate();
         user2.IsActive = true;
-        
+
         // Create UserOrganization entities with proper navigation properties
         var userOrg1 = new UserOrganization
         {
@@ -189,7 +189,7 @@ public class OrganizationEnhancedTests : BaseUnitTest
             User = user2,
             Organization = organization
         };
-        
+
         organization.UserOrganizations.Add(userOrg1);
         organization.UserOrganizations.Add(userOrg2);
 
@@ -386,11 +386,12 @@ public class OrganizationEnhancedTests : BaseUnitTest
     {
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
+        organization.IsActive = true; // Must be active to test user limit validation
         organization.MaxUsers = 1;
-        
+
         var existingUser = TestDataFactory.UserFaker.Generate();
         existingUser.IsActive = true;
-        
+
         // Create UserOrganization entity with proper navigation properties
         var userOrg = new UserOrganization
         {
@@ -402,7 +403,7 @@ public class OrganizationEnhancedTests : BaseUnitTest
             User = existingUser,
             Organization = organization
         };
-        
+
         organization.UserOrganizations.Add(userOrg);
 
         // Act & Assert
@@ -471,4 +472,4 @@ public class OrganizationEnhancedTests : BaseUnitTest
         act.Should().Throw<OrganizationInactiveException>()
            .WithMessage($"Organization {organization.Name} is not active.");
     }
-} 
+}

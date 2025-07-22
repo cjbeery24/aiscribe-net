@@ -26,49 +26,17 @@ public class TenantMiddleware
     {
         try
         {
-            // Check if endpoint is marked as public
-            if (IsPublicEndpoint(context))
-            {
-                await _next(context);
-                return;
-            }
-
-            // Check if user is authenticated (required for all non-public endpoints)
-            if (!context.User.Identity?.IsAuthenticated ?? true)
-            {
-                _logger.LogWarning("Unauthenticated request to {Path}", context.Request.Path);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    message = "Authentication required",
-                    errors = new[] { "Valid JWT token is required" }
-                });
-                return;
-            }
-
-            // Always resolve user context for authenticated requests
-            var userContext = await ResolveUserContextAsync(context, userRepository);
+            // Get user context (should already be resolved by AuthenticationMiddleware)
+            var userContext = context.GetUserContext();
             if (userContext == null)
             {
-                // User validation failed
-                _logger.LogWarning("Failed to resolve user context for request to {Path}", context.Request.Path);
+                _logger.LogWarning("User context not found for tenant resolution on {Path}", context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    message = "User validation failed",
-                    errors = new[] { "Invalid or inactive user" }
+                    message = "User context not found",
+                    errors = new[] { "User must be authenticated before tenant resolution" }
                 });
-                return;
-            }
-
-            // Store user context for all authenticated requests
-            context.Items["UserContext"] = userContext;
-            _logger.LogDebug("User context resolved: {UserId}", userContext.UserId);
-
-            // Check if endpoint is marked as organization-agnostic
-            if (IsOrganizationAgnosticEndpoint(context))
-            {
-                await _next(context);
                 return;
             }
 
@@ -108,39 +76,6 @@ public class TenantMiddleware
             _logger.LogError(ex, "Error in tenant middleware for request to {Path}", context.Request.Path);
             throw;
         }
-    }
-
-    private async Task<UserContext?> ResolveUserContextAsync(HttpContext context, IUserRepository userRepository)
-    {
-        // Extract user ID from claims
-        var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
-        {
-            _logger.LogWarning("User ID claim not found or invalid");
-            return null;
-        }
-
-        // Get user (without organization membership for organization-agnostic endpoints)
-        var user = await userRepository.GetByIdAsync(userId);
-        if (user == null)
-        {
-            _logger.LogWarning("User not found: {UserId}", userId);
-            return null;
-        }
-
-        // Check if user is active
-        if (!user.IsActive)
-        {
-            _logger.LogWarning("Inactive user attempted access: {UserId}", userId);
-            return null;
-        }
-
-        // Create user context
-        return new UserContext
-        {
-            UserId = userId,
-            User = user
-        };
     }
 
     private async Task<TenantContext?> ResolveTenantContextAsync(HttpContext context, IUserRepository userRepository, UserContext userContext)
@@ -185,51 +120,6 @@ public class TenantMiddleware
             Membership = membership
         };
     }
-
-    private static bool IsPublicEndpoint(HttpContext context)
-    {
-        var endpoint = context.GetEndpoint();
-        if (endpoint == null) return false;
-
-        // Check for PublicEndpoint attribute on the endpoint
-        var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
-        if (publicAttribute != null) return true;
-
-        // Check for PublicEndpoint attribute on the controller
-        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
-        if (controllerAttribute != null) return true;
-
-        // Fallback: Check for specific paths that should always be public
-        var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
-        return pathValue.StartsWith("/health") ||
-               pathValue.StartsWith("/swagger") ||
-               pathValue.StartsWith("/api-docs");
-    }
-
-    private static bool IsOrganizationAgnosticEndpoint(HttpContext context)
-    {
-        var endpoint = context.GetEndpoint();
-        if (endpoint == null) return false;
-
-        // Check for OrganizationAgnostic attribute on the endpoint
-        var agnosticAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
-        if (agnosticAttribute != null) return true;
-
-        // Check for OrganizationAgnostic attribute on the controller
-        var controllerAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
-        if (controllerAttribute != null) return true;
-
-        return false;
-    }
-}
-
-/// <summary>
-/// Context information for the current user (for organization-agnostic endpoints)
-/// </summary>
-public class UserContext
-{
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
 }
 
 /// <summary>

@@ -250,8 +250,76 @@ try
     // Authentication & Authorization
     app.UseAuthentication();
 
-    // Multi-tenant middleware (after authentication, before authorization)
-    app.UseMiddleware<TenantMiddleware>();
+    // Helper function to determine if authentication middleware should be applied
+    static bool ShouldApplyAuthenticationMiddleware(HttpContext context)
+    {
+        // Skip middleware for public endpoints
+        var endpoint = context.GetEndpoint();
+        if (endpoint == null) return false;
+
+        // Check for PublicEndpoint attribute
+        var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (publicAttribute != null) return false;
+
+        // Check for PublicEndpoint attribute on controller
+        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (controllerAttribute != null) return false;
+
+        // Skip for health checks and swagger
+        var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
+        if (pathValue.StartsWith("/health") ||
+            pathValue.StartsWith("/swagger") ||
+            pathValue.StartsWith("/api-docs"))
+            return false;
+
+        // Apply authentication middleware to all other routes
+        return true;
+    }
+
+    // Helper function to determine if tenant middleware should be applied
+    static bool ShouldApplyTenantMiddleware(HttpContext context)
+    {
+        // Skip tenant middleware for public endpoints
+        var endpoint = context.GetEndpoint();
+        if (endpoint == null) return false;
+
+        // Check for PublicEndpoint attribute
+        var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (publicAttribute != null) return false;
+
+        // Check for PublicEndpoint attribute on controller
+        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
+        if (controllerAttribute != null) return false;
+
+        // Skip for health checks and swagger
+        var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
+        if (pathValue.StartsWith("/health") ||
+            pathValue.StartsWith("/swagger") ||
+            pathValue.StartsWith("/api-docs"))
+            return false;
+
+        // Skip tenant middleware for organization-agnostic endpoints
+        var agnosticAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
+        if (agnosticAttribute != null) return false;
+
+        var agnosticControllerAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
+        if (agnosticControllerAttribute != null) return false;
+
+        // Apply tenant middleware to organization-specific routes only
+        return true;
+    }
+
+    // Authentication middleware (only for non-public endpoints)
+    app.UseWhen(ShouldApplyAuthenticationMiddleware, appBuilder =>
+    {
+        appBuilder.UseMiddleware<SermonTranscription.Api.Middleware.AuthenticationMiddleware>();
+    });
+
+    // Multi-tenant middleware (only for organization-specific endpoints)
+    app.UseWhen(ShouldApplyTenantMiddleware, appBuilder =>
+    {
+        appBuilder.UseMiddleware<TenantMiddleware>();
+    });
 
     app.UseAuthorization();
 
