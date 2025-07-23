@@ -2,6 +2,8 @@
 
 A robust, multi-tenant .NET 8 API for managing sermon transcriptions with comprehensive user and organization management capabilities.
 
+> **Development Approach**: This project is being developed using a structured prompt-driven methodology. The `/pm` directory contains project management prompts for creating PRDs (Product Requirements Documents), generating tasks, and processing task lists. The `/tasks` directory contains the actual PRD and task breakdown that guides the development process. This approach ensures systematic feature development and comprehensive documentation.
+
 ## 🚀 Features
 
 - **Multi-tenant Architecture**: JWT-based authentication with organization context via headers
