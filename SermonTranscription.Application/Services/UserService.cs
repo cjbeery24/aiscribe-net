@@ -227,7 +227,7 @@ public class UserService : IUserService
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(organizationId, userId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
             if (userOrg == null)
             {
                 return ServiceResult<OrganizationUserResponse>.Failure("User not found in organization");
@@ -247,7 +247,7 @@ public class UserService : IUserService
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(organizationId, userId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
             if (userOrg == null)
             {
                 return ServiceResult<OrganizationUserResponse>.Failure("User not found in organization");
@@ -276,7 +276,7 @@ public class UserService : IUserService
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(organizationId, userId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");
@@ -298,7 +298,7 @@ public class UserService : IUserService
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(organizationId, userId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");
@@ -321,7 +321,7 @@ public class UserService : IUserService
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(organizationId, userId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");

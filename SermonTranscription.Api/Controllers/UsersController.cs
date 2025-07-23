@@ -27,6 +27,7 @@ public class UsersController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>User profile information</returns>
     [HttpGet("profile")]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -51,6 +52,7 @@ public class UsersController : BaseAuthenticatedApiController
     /// <param name="request">Profile update request</param>
     /// <returns>Updated user profile</returns>
     [HttpPut("profile")]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -76,6 +78,7 @@ public class UsersController : BaseAuthenticatedApiController
     /// <param name="request">Password change request</param>
     /// <returns>Password change confirmation</returns>
     [HttpPost("change-password")]
+    [OrganizationAgnostic]
     [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
