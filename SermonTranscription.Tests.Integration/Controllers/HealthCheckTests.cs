@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using SermonTranscription.Tests.Integration.Common;
 using System.Net;
 
@@ -31,7 +30,7 @@ public class HealthCheckTests : BaseIntegrationTest
     public async Task HealthCheck_ShouldNotRequire_Authentication()
     {
         // Arrange - Ensure no auth header is set
-        ClearAuthorizationHeader();
+        ClearHeaders();
 
         // Act
         var response = await HttpClient.GetAsync("/health");
@@ -66,11 +65,10 @@ public class HealthCheckTests : BaseIntegrationTest
         response.IsSuccessStatusCode.Should().BeTrue();
 
         // Verify we can access the database context
-        var dbContext = GetDbContext();
-        dbContext.Should().NotBeNull();
+        DbContext.Should().NotBeNull();
 
         // Verify database was created
-        var canConnect = await dbContext.Database.CanConnectAsync();
+        var canConnect = await DbContext.Database.CanConnectAsync();
         canConnect.Should().BeTrue();
     }
 
@@ -96,24 +94,6 @@ public class HealthCheckTests : BaseIntegrationTest
         orgCountAfterClear.Should().Be(0);
     }
 
-    [Fact]
-    public async Task TestInfrastructure_ShouldSupport_HttpClientHelpers()
-    {
-        // Arrange
-        var testData = new { message = "test", value = 123 };
-
-        // Act - Test JSON content creation
-        var jsonContent = CreateJsonContent(testData);
-
-        // Assert
-        jsonContent.Should().NotBeNull();
-        jsonContent.Headers.ContentType?.MediaType.Should().Be("application/json");
-
-        var contentString = await jsonContent.ReadAsStringAsync();
-        contentString.Should().Contain("test");
-        contentString.Should().Contain("123");
-    }
-
     [Theory]
     [InlineData("/health")]
     [InlineData("/Health")]
@@ -125,31 +105,23 @@ public class HealthCheckTests : BaseIntegrationTest
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.IsSuccessStatusCode.Should().BeTrue();
     }
 
     [Fact]
     public async Task DatabaseContext_ShouldSupport_EntityOperations()
     {
         // Arrange
-        var user = await CreateTestUserAsync("dbtest@example.com", "DB", "Test");
+        var user = await CreateTestUserAsync("test@example.com");
+        var organization = await CreateTestOrganizationAsync("Test Organization");
 
-        // Act & Assert - Verify user was created
-        user.Should().NotBeNull();
-        user.Email.Should().Be("dbtest@example.com");
-        user.FirstName.Should().Be("DB");
-        user.LastName.Should().Be("Test");
+        // Act & Assert - Verify entities were created
+        var retrievedUser = await DbContext.Users.FindAsync(user.Id);
+        retrievedUser.Should().NotBeNull();
+        retrievedUser!.Email.Should().Be("test@example.com");
 
-        // Verify in database
-        var savedUser = await DbContext.Users.FindAsync(user.Id);
-        savedUser.Should().NotBeNull();
-        savedUser!.Email.Should().Be(user.Email);
-
-        // Verify organization was also created
-        var userOrg = await DbContext.UserOrganizations
-            .Include(uo => uo.Organization)
-            .FirstOrDefaultAsync(uo => uo.UserId == user.Id);
-        userOrg.Should().NotBeNull();
-        userOrg!.Organization.Should().NotBeNull();
-        userOrg.Organization.Name.Should().Be("Test Organization");
+        var retrievedOrg = await DbContext.Organizations.FindAsync(organization.Id);
+        retrievedOrg.Should().NotBeNull();
+        retrievedOrg!.Name.Should().Be("Test Organization");
     }
 }
