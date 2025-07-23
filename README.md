@@ -56,7 +56,7 @@ SermonTranscription/
 
 ```bash
 git clone <repository-url>
-cd net-api
+cd aiscribe-net
 ```
 
 ### 2. Configuration
