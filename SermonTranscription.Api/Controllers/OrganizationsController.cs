@@ -171,31 +171,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     }
 
     /// <summary>
-    /// Delete organization
-    /// </summary>
-    /// <returns>Deletion confirmation</returns>
-    [HttpDelete]
-    [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteOrganization()
-    {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.DeleteOrganizationAsync(tenantContext.OrganizationId);
-            return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error deleting organization");
-        }
-    }
-
-    /// <summary>
     /// Activate organization
     /// </summary>
     /// <returns>Activation confirmation</returns>

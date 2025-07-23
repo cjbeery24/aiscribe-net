@@ -3,6 +3,7 @@ using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Common;
 using SermonTranscription.Application.Interfaces;
 using SermonTranscription.Domain.Entities;
+using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Domain.Exceptions;
 
@@ -78,6 +79,22 @@ public class OrganizationService : IOrganizationService
 
             // Save organization
             await _organizationRepository.AddAsync(organization);
+
+            // Create user-organization relationship (user becomes admin)
+            var userOrganization = new UserOrganization
+            {
+                UserId = createdByUserId,
+                OrganizationId = organization.Id,
+                Role = UserRole.OrganizationAdmin,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Add the user-organization relationship to the organization
+            organization.UserOrganizations.Add(userOrganization);
+
+            // Update the organization to save the user-organization relationship
+            await _organizationRepository.UpdateAsync(organization);
 
             _logger.LogInformation("Organization created: {OrganizationId} by user {UserId}", organization.Id, createdByUserId);
 
@@ -360,33 +377,7 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult> DeleteOrganizationAsync(Guid organizationId)
-    {
-        try
-        {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
-            if (organization == null)
-            {
-                return ServiceResult.Failure("Organization not found");
-            }
 
-            // Check if organization has active users
-            if (organization.GetActiveUserCount() > 0)
-            {
-                return ServiceResult.Failure("Cannot delete organization with active users. Please remove all users first.");
-            }
-
-            await _organizationRepository.DeleteAsync(organizationId);
-
-            _logger.LogInformation("Organization deleted: {OrganizationId}", organizationId);
-            return ServiceResult.Success("Organization deleted successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting organization {OrganizationId}", organizationId);
-            return ServiceResult.Failure("An error occurred while deleting the organization");
-        }
-    }
 
     public async Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId)
     {

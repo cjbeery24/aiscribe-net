@@ -4,6 +4,8 @@ using SermonTranscription.Tests.Integration.Common;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Services;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using SermonTranscription.Infrastructure.Data;
 
 namespace SermonTranscription.Tests.Integration.Controllers;
 
@@ -206,10 +208,18 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         result.PhoneNumber.Should().Be(request.PhoneNumber);
         result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
 
-        // Verify organization was updated in database
-        var updatedOrg = await DbContext.Organizations.FindAsync(organization.Id);
+        // Verify the update was persisted to database
+        var updatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
         updatedOrg.Should().NotBeNull();
         updatedOrg!.Name.Should().Be(request.Name);
+        updatedOrg.Description.Should().Be(request.Description);
+        updatedOrg.WebsiteUrl.Should().Be(request.WebsiteUrl);
+        updatedOrg.Address.Should().Be(request.Address);
+        updatedOrg.City.Should().Be(request.City);
+        updatedOrg.State.Should().Be(request.State);
+        updatedOrg.PostalCode.Should().Be(request.PostalCode);
+        updatedOrg.Country.Should().Be(request.Country);
+        updatedOrg.PhoneNumber.Should().Be(request.PhoneNumber);
     }
 
     [Fact]
@@ -262,6 +272,14 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         result.MaxTranscriptionHours.Should().Be(request.MaxTranscriptionHours);
         result.CanExportTranscriptions.Should().Be(request.CanExportTranscriptions!.Value);
         result.HasRealtimeTranscription.Should().Be(request.HasRealtimeTranscription!.Value);
+
+        // Verify the update was persisted to database
+        var updatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
+        updatedOrg.Should().NotBeNull();
+        updatedOrg!.MaxUsers.Should().Be(request.MaxUsers);
+        updatedOrg.MaxTranscriptionHours.Should().Be(request.MaxTranscriptionHours);
+        updatedOrg.CanExportTranscriptions.Should().Be(request.CanExportTranscriptions!.Value);
+        updatedOrg.HasRealtimeTranscription.Should().Be(request.HasRealtimeTranscription!.Value);
     }
 
     [Fact]
@@ -287,47 +305,14 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.LogoUrl.Should().Be(request.LogoUrl);
+
+        // Verify the update was persisted to database
+        var updatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
+        updatedOrg.Should().NotBeNull();
+        updatedOrg!.LogoUrl.Should().Be(request.LogoUrl);
     }
 
-    [Fact]
-    public async Task DeleteOrganization_WithAdminRole_ShouldDeleteOrganizationAndReturnSuccess()
-    {
-        // Arrange
-        var (user, organization, _) = await CreateTestUserWithOrganizationAsync("admin@example.com", Domain.Enums.UserRole.OrganizationAdmin);
-        var token = GenerateJwtTokenAsync(user, organization);
-        SetAuthorizationHeader(token);
-        SetOrganizationHeader(organization.Id);
 
-        // Act
-        var response = await HttpClient.DeleteAsync("/api/v1.0/organizations");
-
-        // Assert
-        await AssertSuccessStatusCodeAsync(response);
-
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
-        result.Should().NotBeNull();
-        result!.Message.Should().Contain("deleted");
-
-        // Verify organization was deleted in database
-        var deletedOrg = await DbContext.Organizations.FindAsync(organization.Id);
-        deletedOrg.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task DeleteOrganization_WithoutAdminRole_ShouldReturnForbidden()
-    {
-        // Arrange
-        var (user, organization, _) = await CreateTestUserWithOrganizationAsync("user@example.com", Domain.Enums.UserRole.OrganizationUser);
-        var token = GenerateJwtTokenAsync(user, organization);
-        SetAuthorizationHeader(token);
-        SetOrganizationHeader(organization.Id);
-
-        // Act
-        var response = await HttpClient.DeleteAsync("/api/v1.0/organizations");
-
-        // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
-    }
 
     [Fact]
     public async Task ActivateOrganization_WithAdminRole_ShouldActivateOrganizationAndReturnSuccess()
@@ -354,7 +339,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         result!.Message.Should().Contain("activated");
 
         // Verify organization was activated in database
-        var activatedOrg = await DbContext.Organizations.FindAsync(organization.Id);
+        var activatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
         activatedOrg.Should().NotBeNull();
         activatedOrg!.IsActive.Should().BeTrue();
     }
@@ -379,7 +364,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         result!.Message.Should().Contain("deactivated");
 
         // Verify organization was deactivated in database
-        var deactivatedOrg = await DbContext.Organizations.FindAsync(organization.Id);
+        var deactivatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
         deactivatedOrg.Should().NotBeNull();
         deactivatedOrg!.IsActive.Should().BeFalse();
     }

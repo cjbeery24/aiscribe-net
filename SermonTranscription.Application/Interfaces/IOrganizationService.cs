@@ -15,7 +15,6 @@ public interface IOrganizationService
     Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request);
     Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request);
     Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request);
-    Task<ServiceResult> DeleteOrganizationAsync(Guid organizationId);
     Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId);
     Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId);
     Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId);
