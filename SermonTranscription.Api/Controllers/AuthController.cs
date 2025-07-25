@@ -34,10 +34,14 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _authService.LoginAsync(request.Email, request.Password);
 
             if (!result.IsSuccess)
@@ -45,7 +49,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -58,12 +62,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login for email: {Email}", request.Email);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred during login",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, $"Error during login for email: {request.Email}");
         }
     }
 
@@ -77,10 +76,14 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _authService.RegisterAsync(request);
 
             if (!result.IsSuccess)
@@ -90,14 +93,14 @@ public class AuthController : BaseApiController
                     return Conflict(new ErrorResponse
                     {
                         Message = result.Message,
-                        Errors = new[] { result.Message }
+                        Errors = [result.Message]
                     });
                 }
 
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -108,12 +111,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during registration for email: {Email}", request.Email);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred during registration",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, $"Error during registration for email: {request.Email}");
         }
     }
 
@@ -127,11 +125,11 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
         try
         {
-            // Validate request using base controller method
             var validationResult = ValidateModelState();
             if (validationResult != null) return validationResult;
 
@@ -142,7 +140,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -154,16 +152,9 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during token refresh");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred during token refresh",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error during token refresh");
         }
     }
-
-
 
     /// <summary>
     /// Logout endpoint - revokes all refresh tokens for the current user
@@ -174,14 +165,13 @@ public class AuthController : BaseApiController
     [OrganizationAgnostic]
     [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Logout()
     {
         try
         {
-            // Get user ID from tenant context (already validated by middleware)
             var userId = HttpContext.GetUserId()!.Value;
 
-            // Revoke all refresh tokens for the current user
             await _authService.RevokeAllUserRefreshTokensAsync(userId);
 
             _logger.LogInformation("User {UserId} logged out and all refresh tokens revoked", userId);
@@ -193,12 +183,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during logout");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred during logout",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error during logout");
         }
     }
 
@@ -211,10 +196,14 @@ public class AuthController : BaseApiController
     [PublicEndpoint]
     [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _authService.ForgotPasswordAsync(request.Email);
 
             if (!result.IsSuccess)
@@ -222,7 +211,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -233,12 +222,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during forgot password for email: {Email}", request.Email);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while processing your request",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, $"Error during forgot password for email: {request.Email}");
         }
     }
 
@@ -252,10 +236,14 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
 
             if (!result.IsSuccess)
@@ -263,7 +251,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -274,12 +262,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during password reset");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while resetting your password",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error during password reset");
         }
     }
 
@@ -295,11 +278,14 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
     {
         try
         {
-            // Get tenant context and user ID from middleware (already validated)
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var tenantContext = HttpContext.GetTenantContext()!;
             var userId = HttpContext.GetUserId()!.Value;
 
@@ -310,7 +296,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -318,12 +304,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during user invitation");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while sending the invitation",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error during user invitation");
         }
     }
 
@@ -337,10 +318,14 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(AcceptInvitationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var result = await _invitationService.AcceptInvitationAsync(request);
 
             if (!result.Success)
@@ -348,7 +333,7 @@ public class AuthController : BaseApiController
                 return BadRequest(new ErrorResponse
                 {
                     Message = result.Message,
-                    Errors = new[] { result.Message }
+                    Errors = [result.Message]
                 });
             }
 
@@ -356,12 +341,7 @@ public class AuthController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during invitation acceptance");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while accepting the invitation",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error during invitation acceptance");
         }
     }
 
@@ -374,26 +354,20 @@ public class AuthController : BaseApiController
     [OrganizationAgnostic]
     [ProducesResponseType(typeof(List<OrganizationSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetUserOrganizations()
     {
         try
         {
-            // Get user ID from context (middleware validates and provides this)
             var userId = HttpContext.GetUserId()!.Value;
 
-            // Get user's organizations from the service
             var organizations = await _authService.GetUserOrganizationsAsync(userId);
 
             return Ok(organizations);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting organizations for user");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while retrieving organizations",
-                Errors = ["Internal server error"]
-            });
+            return HandleException(ex, "Error getting organizations for user");
         }
     }
 }

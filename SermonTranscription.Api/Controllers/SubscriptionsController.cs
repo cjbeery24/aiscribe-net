@@ -27,7 +27,9 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     [HttpGet("plans")]
     [PublicEndpoint]
-    public async Task<ActionResult<IEnumerable<SubscriptionPlanResponse>>> GetAvailablePlans()
+    [ProducesResponseType(typeof(IEnumerable<SubscriptionPlanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetAvailablePlans()
     {
         try
         {
@@ -36,12 +38,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving available subscription plans");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while retrieving subscription plans",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, "Error retrieving available subscription plans");
         }
     }
 
@@ -49,7 +46,10 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// Get current subscription for the authenticated user's organization
     /// </summary>
     [HttpGet("current")]
-    public async Task<ActionResult<SubscriptionResponse>> GetCurrentSubscription()
+    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetCurrentSubscription()
     {
         try
         {
@@ -61,7 +61,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
                 return NotFound(new ErrorResponse
                 {
                     Message = "No active subscription found for this organization",
-                    Errors = new[] { "Subscription not found" }
+                    Errors = ["Subscription not found"]
                 });
             }
 
@@ -69,12 +69,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving current subscription for organization {OrganizationId}", HttpContext.GetTenantContext()?.OrganizationId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while retrieving the subscription",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error retrieving current subscription for organization {HttpContext.GetTenantContext()?.OrganizationId}");
         }
     }
 
@@ -82,7 +77,9 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// Get all subscriptions for the authenticated user's organization
     /// </summary>
     [HttpGet("history")]
-    public async Task<ActionResult<IEnumerable<SubscriptionResponse>>> GetSubscriptionHistory()
+    [ProducesResponseType(typeof(IEnumerable<SubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetSubscriptionHistory()
     {
         try
         {
@@ -92,12 +89,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving subscription history for organization {OrganizationId}", HttpContext.GetTenantContext()?.OrganizationId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while retrieving subscription history",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error retrieving subscription history for organization {HttpContext.GetTenantContext()?.OrganizationId}");
         }
     }
 
@@ -106,11 +98,16 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     [HttpPost]
     [RequireOrganizationAdmin]
-    public async Task<ActionResult<SubscriptionResponse>> CreateSubscription(
-        [FromBody] CreateSubscriptionRequest request)
+    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CreateSubscription([FromBody] CreateSubscriptionRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var tenantContext = HttpContext.GetTenantContext()!;
             var subscription = await _subscriptionService.CreateSubscriptionAsync(tenantContext.OrganizationId, request.Plan, HttpContext.RequestAborted);
 
@@ -121,17 +118,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return BadRequest(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating subscription for organization {OrganizationId}", HttpContext.GetTenantContext()?.OrganizationId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while creating the subscription",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error creating subscription for organization {HttpContext.GetTenantContext()?.OrganizationId}");
         }
     }
 
@@ -140,12 +132,17 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     [HttpPut("{subscriptionId}/plan")]
     [RequireOrganizationAdmin]
-    public async Task<ActionResult<SubscriptionResponse>> ChangeSubscriptionPlan(
-        Guid subscriptionId,
-        [FromBody] ChangeSubscriptionPlanRequest request)
+    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ChangeSubscriptionPlan(Guid subscriptionId, [FromBody] ChangeSubscriptionPlanRequest request)
     {
         try
         {
+            var validationResult = ValidateModelState();
+            if (validationResult != null) return validationResult;
+
             var subscription = await _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, request.NewPlan, HttpContext.RequestAborted);
             return Ok(subscription);
         }
@@ -154,7 +151,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return NotFound(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex) when (ex.Message.Contains("inactive") || ex.Message.Contains("already"))
@@ -162,17 +159,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return BadRequest(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error changing subscription plan {SubscriptionId} to {NewPlan}", subscriptionId, request.NewPlan);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while changing the subscription plan",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error changing subscription plan {subscriptionId} to {request.NewPlan}");
         }
     }
 
@@ -181,8 +173,11 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     [HttpPost("{subscriptionId}/cancel")]
     [RequireOrganizationAdmin]
-    public async Task<ActionResult<SubscriptionResponse>> CancelSubscription(
-        Guid subscriptionId)
+    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelSubscription(Guid subscriptionId)
     {
         try
         {
@@ -194,7 +189,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return NotFound(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex) when (ex.Message.Contains("already cancelled"))
@@ -202,17 +197,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return BadRequest(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error cancelling subscription {SubscriptionId}", subscriptionId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while cancelling the subscription",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error cancelling subscription {subscriptionId}");
         }
     }
 
@@ -221,8 +211,11 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     [HttpPost("{subscriptionId}/reactivate")]
     [RequireOrganizationAdmin]
-    public async Task<ActionResult<SubscriptionResponse>> ReactivateSubscription(
-        Guid subscriptionId)
+    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ReactivateSubscription(Guid subscriptionId)
     {
         try
         {
@@ -234,7 +227,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return NotFound(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex) when (ex.Message.Contains("already active"))
@@ -242,17 +235,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return BadRequest(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reactivating subscription {SubscriptionId}", subscriptionId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while reactivating the subscription",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error reactivating subscription {subscriptionId}");
         }
     }
 
@@ -260,7 +248,10 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// Get subscription usage analytics for the authenticated user's organization
     /// </summary>
     [HttpGet("analytics")]
-    public async Task<ActionResult<SubscriptionUsageResponse>> GetUsageAnalytics()
+    [ProducesResponseType(typeof(SubscriptionUsageResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetUsageAnalytics()
     {
         try
         {
@@ -273,17 +264,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
             return NotFound(new ErrorResponse
             {
                 Message = ex.Message,
-                Errors = new[] { ex.Message }
+                Errors = [ex.Message]
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving usage analytics for organization {OrganizationId}", HttpContext.GetTenantContext()?.OrganizationId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while retrieving usage analytics",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error retrieving usage analytics for organization {HttpContext.GetTenantContext()?.OrganizationId}");
         }
     }
 
@@ -291,8 +277,9 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// Check if the organization can use transcription minutes based on subscription limits
     /// </summary>
     [HttpGet("limits/transcription")]
-    public async Task<ActionResult<object>> CheckTranscriptionLimit(
-        [FromQuery] int minutes)
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CheckTranscriptionLimit([FromQuery] int minutes)
     {
         try
         {
@@ -303,14 +290,7 @@ public class SubscriptionsController : BaseAuthenticatedApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking transcription limit for organization {OrganizationId}", HttpContext.GetTenantContext()?.OrganizationId);
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "An error occurred while checking transcription limits",
-                Errors = new[] { "Internal server error" }
-            });
+            return HandleException(ex, $"Error checking transcription limit for organization {HttpContext.GetTenantContext()?.OrganizationId}");
         }
     }
-
-
 }
