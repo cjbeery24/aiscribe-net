@@ -105,9 +105,6 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var tenantContext = HttpContext.GetTenantContext()!;
             var subscription = await _subscriptionService.CreateSubscriptionAsync(tenantContext.OrganizationId, request.Plan, HttpContext.RequestAborted);
 
@@ -140,9 +137,6 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var subscription = await _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, request.NewPlan, HttpContext.RequestAborted);
             return Ok(subscription);
         }

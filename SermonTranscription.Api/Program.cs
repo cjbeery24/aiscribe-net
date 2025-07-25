@@ -9,6 +9,7 @@ using SermonTranscription.Application;
 using SermonTranscription.Infrastructure;
 using Serilog;
 using System.Text;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 // Create initial configuration to read Serilog settings
 var configuration = new ConfigurationBuilder()
@@ -232,6 +233,35 @@ try
     // FluentValidation
     builder.Services.AddFluentValidationAutoValidation()
                     .AddFluentValidationClientsideAdapters();
+
+    // Log discovered validators (for debugging)
+    var validators = builder.Services.Where(s => s.ServiceType.Name.Contains("Validator")).ToList();
+    Log.Information("Discovered {ValidatorCount} FluentValidation validators", validators.Count);
+    foreach (var validator in validators)
+    {
+        Log.Information("Found validator: {ValidatorType}", validator.ServiceType.Name);
+    }
+
+    // Configure validation error response format
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(x => x.Value!.Errors)
+                .Select(x => x.ErrorMessage ?? "Unknown validation error")
+                .ToArray();
+
+            var errorResponse = new SermonTranscription.Application.DTOs.ErrorResponse
+            {
+                Message = "Invalid request data",
+                Errors = errors
+            };
+
+            return new BadRequestObjectResult(errorResponse);
+        };
+    });
 
     // Health Checks
     builder.Services.AddHealthChecks();

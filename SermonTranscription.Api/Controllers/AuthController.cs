@@ -39,8 +39,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
 
             var result = await _authService.LoginAsync(request.Email, request.Password);
 
@@ -81,8 +79,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
 
             var result = await _authService.RegisterAsync(request);
 
@@ -130,9 +126,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var result = await _authService.RefreshTokenAsync(request.RefreshToken);
 
             if (!result.IsSuccess)
@@ -201,9 +194,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var result = await _authService.ForgotPasswordAsync(request.Email);
 
             if (!result.IsSuccess)
@@ -241,9 +231,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
 
             if (!result.IsSuccess)
@@ -283,9 +270,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var tenantContext = HttpContext.GetTenantContext()!;
             var userId = HttpContext.GetUserId()!.Value;
 
@@ -323,9 +307,6 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var result = await _invitationService.AcceptInvitationAsync(request);
 
             if (!result.Success)

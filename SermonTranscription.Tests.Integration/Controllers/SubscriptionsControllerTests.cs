@@ -239,7 +239,8 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
 
         var request = new CreateSubscriptionRequest
         {
-            Plan = SubscriptionPlan.Professional
+            Plan = SubscriptionPlan.Professional,
+            OrganizationId = organization.Id
         };
 
         // Act

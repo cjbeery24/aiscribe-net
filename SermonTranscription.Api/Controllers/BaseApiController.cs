@@ -22,28 +22,6 @@ public abstract class BaseApiController : ControllerBase
     #region Protected Helper Methods
 
     /// <summary>
-    /// Validates the model state and returns an error response if invalid
-    /// </summary>
-    /// <returns>UnprocessableEntity result if validation fails, null if valid</returns>
-    protected IActionResult? ValidateModelState()
-    {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-
-            return UnprocessableEntity(new ErrorResponse
-            {
-                Message = "Invalid request data",
-                Errors = errors.ToArray()
-            });
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Handles service results with data and returns appropriate HTTP responses
     /// </summary>
     /// <typeparam name="T">Type of data in the service result</typeparam>

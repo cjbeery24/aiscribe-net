@@ -37,9 +37,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var userId = GetCurrentUserId();
             if (!userId.HasValue)
             {
@@ -99,9 +96,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var tenantContext = HttpContext.GetTenantContext()!;
             var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
@@ -128,9 +122,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var tenantContext = HttpContext.GetTenantContext()!;
             var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
@@ -157,9 +148,6 @@ public class OrganizationsController : BaseAuthenticatedApiController
     {
         try
         {
-            var validationResult = ValidateModelState();
-            if (validationResult != null) return validationResult;
-
             var tenantContext = HttpContext.GetTenantContext()!;
             var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));

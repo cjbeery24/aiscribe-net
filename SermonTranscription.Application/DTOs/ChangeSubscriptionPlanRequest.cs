@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using SermonTranscription.Domain.Enums;
 
 namespace SermonTranscription.Application.DTOs;
@@ -8,6 +7,5 @@ namespace SermonTranscription.Application.DTOs;
 /// </summary>
 public class ChangeSubscriptionPlanRequest
 {
-    [Required]
     public SubscriptionPlan NewPlan { get; set; }
 }

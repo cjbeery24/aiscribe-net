@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace SermonTranscription.Application.DTOs;
 
 /// <summary>
@@ -7,7 +5,5 @@ namespace SermonTranscription.Application.DTOs;
 /// </summary>
 public class UpdateOrganizationLogoRequest
 {
-    [Required(ErrorMessage = "Logo URL is required")]
-    [Url(ErrorMessage = "Invalid logo URL")]
     public string LogoUrl { get; set; } = string.Empty;
 }
