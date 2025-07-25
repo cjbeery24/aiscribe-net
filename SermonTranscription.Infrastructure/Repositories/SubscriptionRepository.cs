@@ -101,7 +101,7 @@ public class SubscriptionRepository : BaseRepository<Subscription>, ISubscriptio
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<decimal> GetTotalUsageMinutesAsync(Guid organizationId, DateTime? fromDate = null, CancellationToken cancellationToken = default)
+    public async Task<int> GetTotalUsageMinutesAsync(Guid organizationId, DateTime? fromDate = null, CancellationToken cancellationToken = default)
     {
         var query = _context.Subscriptions
             .Where(s => s.OrganizationId == organizationId);
@@ -114,12 +114,12 @@ public class SubscriptionRepository : BaseRepository<Subscription>, ISubscriptio
         return await query.SumAsync(s => s.TranscriptionMinutesUsed, cancellationToken);
     }
 
-    public async Task UpdateUsageAsync(Guid subscriptionId, decimal minutesUsed, CancellationToken cancellationToken = default)
+    public async Task UpdateUsageAsync(Guid subscriptionId, int minutesUsed, CancellationToken cancellationToken = default)
     {
         var subscription = await _context.Subscriptions.FindAsync(new object[] { subscriptionId }, cancellationToken);
         if (subscription != null)
         {
-            subscription.TranscriptionMinutesUsed += (int)minutesUsed;
+            subscription.TranscriptionMinutesUsed += minutesUsed;
             subscription.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
         }

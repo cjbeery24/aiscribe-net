@@ -50,8 +50,8 @@ public static class DependencyInjection
         services.AddScoped<IOrganizationRepository, Repositories.OrganizationRepository>();
         services.AddScoped<IUserOrganizationRepository, Repositories.UserOrganizationRepository>();
         services.AddScoped<ISubscriptionRepository, Repositories.SubscriptionRepository>();
-        // services.AddScoped<ITranscriptionRepository, Repositories.TranscriptionRepository>();
-        // services.AddScoped<ITranscriptionSessionRepository, Repositories.TranscriptionSessionRepository>();
+        services.AddScoped<ITranscriptionRepository, Repositories.TranscriptionRepository>();
+        services.AddScoped<ITranscriptionSessionRepository, Repositories.TranscriptionSessionRepository>();
 
         // Service registrations
         services.AddScoped<IEmailService, EmailService>();

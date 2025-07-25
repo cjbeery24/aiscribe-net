@@ -15,7 +15,7 @@ public class SubscriptionUsageResponse
     public int MonthlyLimit { get; set; }
     public int MinutesUsed { get; set; }
     public int MinutesRemaining { get; set; }
-    public decimal TotalUsage { get; set; }
+    public int TotalUsage { get; set; }
     public decimal UsagePercentage { get; set; }
 
     // Usage tracking

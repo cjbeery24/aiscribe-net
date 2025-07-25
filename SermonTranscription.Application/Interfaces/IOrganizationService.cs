@@ -19,4 +19,5 @@ public interface IOrganizationService
     Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationDashboardResponse>> GetOrganizationDashboardAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }

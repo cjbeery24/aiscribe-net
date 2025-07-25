@@ -15,15 +15,27 @@ public class OrganizationService : IOrganizationService
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IUserOrganizationRepository _userOrganizationRepository;
+    private readonly ITranscriptionSessionRepository _transcriptionSessionRepository;
+    private readonly ITranscriptionRepository _transcriptionRepository;
+    private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly ILogger<OrganizationService> _logger;
 
     public OrganizationService(
         IOrganizationRepository organizationRepository,
         IUserRepository userRepository,
+        IUserOrganizationRepository userOrganizationRepository,
+        ITranscriptionSessionRepository transcriptionSessionRepository,
+        ITranscriptionRepository transcriptionRepository,
+        ISubscriptionRepository subscriptionRepository,
         ILogger<OrganizationService> logger)
     {
         _organizationRepository = organizationRepository;
         _userRepository = userRepository;
+        _userOrganizationRepository = userOrganizationRepository;
+        _transcriptionSessionRepository = transcriptionSessionRepository;
+        _transcriptionRepository = transcriptionRepository;
+        _subscriptionRepository = subscriptionRepository;
         _logger = logger;
     }
 
@@ -657,5 +669,169 @@ public class OrganizationService : IOrganizationService
             ActiveUserCount = organization.GetActiveUserCount(),
             HasActiveSubscription = organization.HasActiveSubscription()
         };
+    }
+
+    public async Task<ServiceResult<OrganizationDashboardResponse>> GetOrganizationDashboardAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Get organization
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+            if (organization == null)
+            {
+                return ServiceResult<OrganizationDashboardResponse>.Failure($"Organization with ID {organizationId} not found");
+            }
+
+            // Get all data in parallel for better performance
+            var organizationUsersTask = _userOrganizationRepository.GetOrganizationUsersAsync(organizationId, cancellationToken);
+            var pendingInvitationsTask = _userOrganizationRepository.GetOrganizationPendingInvitationsAsync(organizationId, cancellationToken);
+            var activeSubscriptionTask = _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
+            var totalUsageTask = _subscriptionRepository.GetTotalUsageMinutesAsync(organizationId, null, cancellationToken);
+            var allSessionsTask = _transcriptionSessionRepository.GetByOrganizationAsync(organizationId, cancellationToken);
+            var activeSessionsTask = _transcriptionSessionRepository.GetActiveSessionsAsync(cancellationToken);
+            var recentSessionsTask = _transcriptionSessionRepository.GetRecentSessionsAsync(organizationId, 5, cancellationToken);
+            var allTranscriptionsTask = _transcriptionRepository.GetByOrganizationAsync(organizationId, cancellationToken);
+            var recentTranscriptionsTask = _transcriptionRepository.GetRecentTranscriptionsAsync(organizationId, 5, cancellationToken);
+            var totalDurationTask = _transcriptionRepository.GetTotalDurationAsync(organizationId, null, cancellationToken);
+
+            await Task.WhenAll(
+                organizationUsersTask, pendingInvitationsTask, activeSubscriptionTask, totalUsageTask,
+                allSessionsTask, activeSessionsTask, recentSessionsTask, allTranscriptionsTask,
+                recentTranscriptionsTask, totalDurationTask);
+
+            var organizationUsers = await organizationUsersTask;
+            var pendingInvitations = await pendingInvitationsTask;
+            var activeSubscription = await activeSubscriptionTask;
+            var totalUsage = await totalUsageTask;
+            var allSessions = await allSessionsTask;
+            var activeSessions = await activeSessionsTask;
+            var recentSessions = await recentSessionsTask;
+            var allTranscriptions = await allTranscriptionsTask;
+            var recentTranscriptions = await recentTranscriptionsTask;
+            var totalDuration = await totalDurationTask;
+
+            // Calculate date ranges
+            var now = DateTime.UtcNow;
+            var thirtyDaysAgo = now.AddDays(-30);
+            var sevenDaysAgo = now.AddDays(-7);
+
+            // Build dashboard response
+            var dashboard = new OrganizationDashboardResponse
+            {
+                Overview = new OrganizationOverviewDto
+                {
+                    OrganizationId = organization.Id,
+                    Name = organization.Name,
+                    IsActive = organization.IsActive,
+                    CreatedAt = organization.CreatedAt,
+                    TotalUsers = organizationUsers.Count(),
+                    ActiveUsersLast30Days = organizationUsers.Count(uo => uo.User?.LastLoginAt >= thirtyDaysAgo),
+                    TotalSessions = allSessions.Count(),
+                    TotalTranscriptions = allTranscriptions.Count()
+                },
+
+                UserActivity = new UserActivityDto
+                {
+                    TotalUsers = organizationUsers.Count(),
+                    ActiveUsersLast7Days = organizationUsers.Count(uo => uo.User?.LastLoginAt >= sevenDaysAgo),
+                    ActiveUsersLast30Days = organizationUsers.Count(uo => uo.User?.LastLoginAt >= thirtyDaysAgo),
+                    AdminUsers = organizationUsers.Count(uo => uo.Role == UserRole.OrganizationAdmin),
+                    RegularUsers = organizationUsers.Count(uo => uo.Role == UserRole.OrganizationUser),
+                    PendingInvitations = pendingInvitations.Count(),
+                    RecentUserActivity = organizationUsers
+                        .Where(uo => uo.User?.LastLoginAt != null)
+                        .OrderByDescending(uo => uo.User!.LastLoginAt)
+                        .Take(5)
+                        .Select(uo => new UserActivityItemDto
+                        {
+                            UserId = uo.UserId,
+                            FullName = $"{uo.User!.FirstName} {uo.User.LastName}",
+                            Email = uo.User.Email,
+                            Role = uo.Role.ToString(),
+                            LastLoginAt = uo.User.LastLoginAt,
+                            IsActive = uo.IsActive
+                        })
+                        .ToList()
+                },
+
+                SubscriptionStatus = new SubscriptionStatusDto
+                {
+                    CurrentPlan = activeSubscription?.Plan.ToString() ?? "No Plan",
+                    Status = activeSubscription?.Status.ToString() ?? "Inactive",
+                    MonthlyLimit = activeSubscription?.MaxTranscriptionMinutes ?? 0,
+                    MinutesUsed = activeSubscription?.TranscriptionMinutesUsed ?? 0,
+                    MinutesRemaining = activeSubscription?.RemainingTranscriptionMinutes ?? 0,
+                    UsagePercentage = activeSubscription?.MaxTranscriptionMinutes > 0
+                        ? (decimal)activeSubscription.TranscriptionMinutesUsed / activeSubscription.MaxTranscriptionMinutes * 100
+                        : 0,
+                    IsNearLimit = activeSubscription?.RemainingTranscriptionMinutes <= 120,
+                    UsageResetDate = activeSubscription?.UsageResetDate ?? now.AddMonths(1),
+                    TotalUsage = totalUsage
+                },
+
+                TranscriptionStats = new TranscriptionStatsDto
+                {
+                    TotalSessions = allSessions.Count(),
+                    SessionsLast30Days = allSessions.Count(s => s.CreatedAt >= thirtyDaysAgo),
+                    TotalTranscriptions = allTranscriptions.Count(),
+                    TranscriptionsLast30Days = allTranscriptions.Count(t => t.ProcessedAt >= thirtyDaysAgo),
+                    TotalTranscriptionMinutes = (int)totalDuration.TotalMinutes,
+                    AverageSessionDuration = allSessions.Any()
+                        ? Math.Round((decimal)(totalDuration.TotalMinutes / allSessions.Count()), 2)
+                        : 0,
+                    ActiveSessions = activeSessions.Count(s => s.OrganizationId == organizationId),
+                    MostActiveSpeaker = allTranscriptions
+                        .GroupBy(t => t.Speaker)
+                        .OrderByDescending(g => g.Count())
+                        .FirstOrDefault()?.Key
+                },
+
+                RecentActivity = new RecentActivityDto
+                {
+                    RecentSessions = recentSessions.Select(s => new RecentSessionDto
+                    {
+                        SessionId = s.Id,
+                        Title = s.Title,
+                        Status = s.Status.ToString(),
+                        DurationMinutes = s.Duration?.Minutes ?? 0,
+                        CreatedAt = s.CreatedAt,
+                        CreatedBy = $"{s.CreatedByUser?.FirstName} {s.CreatedByUser?.LastName}".Trim()
+                    }).ToList(),
+
+                    RecentTranscriptions = recentTranscriptions.Select(t => new RecentTranscriptionDto
+                    {
+                        TranscriptionId = t.Id,
+                        Title = t.Title,
+                        Speaker = t.Speaker ?? string.Empty,
+                        DurationMinutes = t.DurationSeconds.GetValueOrDefault(0) / 60,
+                        ProcessedAt = t.ProcessedAt ?? DateTime.UtcNow,
+                        CreatedBy = $"{t.CreatedByUser?.FirstName} {t.CreatedByUser?.LastName}".Trim()
+                    }).ToList(),
+
+                    RecentUserActivities = organizationUsers
+                        .Where(uo => uo.User?.LastLoginAt != null)
+                        .OrderByDescending(uo => uo.User!.LastLoginAt)
+                        .Take(5)
+                        .Select(uo => new RecentUserActivityDto
+                        {
+                            UserId = uo.UserId,
+                            FullName = $"{uo.User!.FirstName} {uo.User.LastName}",
+                            ActivityType = "Login",
+                            Description = $"User logged in",
+                            ActivityDate = uo.User.LastLoginAt!.Value
+                        })
+                        .ToList()
+                }
+            };
+
+            _logger.LogInformation("Dashboard data retrieved for organization {OrganizationId}", organizationId);
+
+            return ServiceResult<OrganizationDashboardResponse>.Success(dashboard);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving dashboard data for organization {OrganizationId}", organizationId);
+            return ServiceResult<OrganizationDashboardResponse>.Failure($"Error retrieving dashboard data: {ex.Message}");
+        }
     }
 }

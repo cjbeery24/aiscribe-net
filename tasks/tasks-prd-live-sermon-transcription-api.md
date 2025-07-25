@@ -116,8 +116,8 @@ Based on: `prd-live-sermon-transcription-api.md`
 - [ ] 3.0 Core API Development (Organizations, Users, Subscriptions)
   - [x] 3.1 Create organization management endpoints (CRUD operations)
   - [x] 3.2 Implement user profile management and organization user endpoints
-  - [ ] 3.3 Build subscription plan management with tier-based feature access
-  - [ ] 3.4 Add organization dashboard data aggregation endpoints
+  - [x] 3.3 Build subscription plan management with tier-based feature access
+  - [x] 3.4 Add organization dashboard data aggregation endpoints
   - [ ] 3.5 Implement input validation, error handling, and consistent API responses
   - [ ] 3.6 Add pagination support for list endpoints
   - [ ] 3.7 Create organization settings management for audio/transcription configuration

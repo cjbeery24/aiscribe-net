@@ -267,4 +267,27 @@ public class OrganizationsController : BaseAuthenticatedApiController
             return HandleException(ex, $"Error retrieving organization with subscriptions");
         }
     }
+
+    /// <summary>
+    /// Get organization dashboard data with comprehensive statistics
+    /// </summary>
+    /// <returns>Organization dashboard data with user activity, subscription status, and transcription statistics</returns>
+    [HttpGet("dashboard")]
+    [ProducesResponseType(typeof(OrganizationDashboardResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOrganizationDashboard()
+    {
+        try
+        {
+            var tenantContext = HttpContext.GetTenantContext()!;
+            var result = await _organizationService.GetOrganizationDashboardAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+            return HandleServiceResult<OrganizationDashboardResponse>(result, () => Ok(result.Data));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex, $"Error retrieving organization dashboard data");
+        }
+    }
 }

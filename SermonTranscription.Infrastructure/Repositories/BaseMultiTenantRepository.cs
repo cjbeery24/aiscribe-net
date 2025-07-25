@@ -17,14 +17,14 @@ public abstract class BaseMultiTenantRepository<T> : BaseRepository<T>, IMultiTe
     }
 
     // Override base methods to ensure organization scoping
-    public override async Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public override Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         // This method should not be used directly for multi-tenant entities
         // Use GetByIdAsync(id, organizationId, cancellationToken) instead
         throw new InvalidOperationException($"Use GetByIdAsync(id, organizationId, cancellationToken) for multi-tenant entity {typeof(T).Name}");
     }
 
-    public override async Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default)
+    public override Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         // This method should not be used directly for multi-tenant entities
         // Use GetAllAsync(organizationId, cancellationToken) instead

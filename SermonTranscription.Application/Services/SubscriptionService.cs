@@ -276,7 +276,7 @@ public class SubscriptionService : ISubscriptionService
     /// <summary>
     /// Get available subscription plans with their features and pricing
     /// </summary>
-    public async Task<IEnumerable<SubscriptionPlanResponse>> GetAvailablePlansAsync(CancellationToken cancellationToken = default)
+    public Task<IEnumerable<SubscriptionPlanResponse>> GetAvailablePlansAsync(CancellationToken cancellationToken = default)
     {
         var plans = new List<SubscriptionPlanResponse>();
 
@@ -299,7 +299,7 @@ public class SubscriptionService : ISubscriptionService
             });
         }
 
-        return plans;
+        return Task.FromResult<IEnumerable<SubscriptionPlanResponse>>(plans);
     }
 
     private static List<string> GetPlanFeatures(SubscriptionPlan plan)

@@ -28,8 +28,8 @@ public interface ISubscriptionRepository : IBaseRepository<Subscription>
     Task<IEnumerable<Subscription>> GetSubscriptionsDueForBillingAsync(DateTime dueDate, CancellationToken cancellationToken = default);
 
     // Usage tracking
-    Task<decimal> GetTotalUsageMinutesAsync(Guid organizationId, DateTime? fromDate = null, CancellationToken cancellationToken = default);
-    Task UpdateUsageAsync(Guid subscriptionId, decimal minutesUsed, CancellationToken cancellationToken = default);
+    Task<int> GetTotalUsageMinutesAsync(Guid organizationId, DateTime? fromDate = null, CancellationToken cancellationToken = default);
+    Task UpdateUsageAsync(Guid subscriptionId, int minutesUsed, CancellationToken cancellationToken = default);
     Task ResetMonthlyUsageAsync(Guid subscriptionId, CancellationToken cancellationToken = default);
 
     // Analytics
