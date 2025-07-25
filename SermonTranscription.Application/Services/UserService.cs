@@ -38,11 +38,11 @@ public class UserService : IUserService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<UserProfileResponse>> GetUserProfileAsync(Guid userId)
+    public async Task<ServiceResult<UserProfileResponse>> GetUserProfileAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<UserProfileResponse>.Failure("User not found");
@@ -58,11 +58,11 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult<UserProfileResponse>> UpdateUserProfileAsync(Guid userId, UpdateUserProfileRequest request)
+    public async Task<ServiceResult<UserProfileResponse>> UpdateUserProfileAsync(Guid userId, UpdateUserProfileRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<UserProfileResponse>.Failure("User not found");
@@ -76,7 +76,7 @@ public class UserService : IUserService
 
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             var response = _mapper.Map<UserProfileResponse>(user);
             return ServiceResult<UserProfileResponse>.Success(response, "User profile updated successfully");
@@ -88,11 +88,11 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
+    public async Task<ServiceResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult.Failure("User not found");
@@ -118,7 +118,7 @@ public class UserService : IUserService
             user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation("Password changed successfully for user {UserId}", userId);
             return ServiceResult.Success("Password changed successfully");
@@ -130,18 +130,18 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> DeactivateUserAsync(Guid userId)
+    public async Task<ServiceResult> DeactivateUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult.Failure("User not found");
             }
 
             user.Deactivate();
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation("User {UserId} deactivated", userId);
             return ServiceResult.Success("User deactivated successfully");
@@ -153,18 +153,18 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> ActivateUserAsync(Guid userId)
+    public async Task<ServiceResult> ActivateUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult.Failure("User not found");
             }
 
             user.Activate();
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation("User {UserId} activated", userId);
             return ServiceResult.Success("User activated successfully");
@@ -176,12 +176,12 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult<OrganizationUserListResponse>> GetOrganizationUsersAsync(Guid organizationId, OrganizationUserSearchRequest request)
+    public async Task<ServiceResult<OrganizationUserListResponse>> GetOrganizationUsersAsync(Guid organizationId, OrganizationUserSearchRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var users = await _userOrganizationRepository.GetOrganizationUsersAsync(organizationId);
-            var totalCount = await _userOrganizationRepository.GetActiveUserCountAsync(organizationId);
+            var users = await _userOrganizationRepository.GetOrganizationUsersAsync(organizationId, cancellationToken);
+            var totalCount = await _userOrganizationRepository.GetActiveUserCountAsync(organizationId, cancellationToken);
 
             // Apply filtering and pagination in memory for now
             var filteredUsers = users.Where(u =>
@@ -223,11 +223,11 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult<OrganizationUserResponse>> GetOrganizationUserAsync(Guid organizationId, Guid userId)
+    public async Task<ServiceResult<OrganizationUserResponse>> GetOrganizationUserAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId, cancellationToken);
             if (userOrg == null)
             {
                 return ServiceResult<OrganizationUserResponse>.Failure("User not found in organization");
@@ -243,11 +243,11 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult<OrganizationUserResponse>> UpdateOrganizationUserRoleAsync(Guid organizationId, Guid userId, UpdateOrganizationUserRoleRequest request)
+    public async Task<ServiceResult<OrganizationUserResponse>> UpdateOrganizationUserRoleAsync(Guid organizationId, Guid userId, UpdateOrganizationUserRoleRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId, cancellationToken);
             if (userOrg == null)
             {
                 return ServiceResult<OrganizationUserResponse>.Failure("User not found in organization");
@@ -260,7 +260,7 @@ public class UserService : IUserService
             }
 
             userOrg.UpdateRole(role);
-            await _userOrganizationRepository.UpdateAsync(userOrg);
+            await _userOrganizationRepository.UpdateAsync(userOrg, cancellationToken);
 
             var response = _mapper.Map<OrganizationUserResponse>(userOrg);
             return ServiceResult<OrganizationUserResponse>.Success(response, "User role updated successfully");
@@ -272,17 +272,17 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> RemoveUserFromOrganizationAsync(Guid organizationId, Guid userId)
+    public async Task<ServiceResult> RemoveUserFromOrganizationAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId, cancellationToken);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");
             }
 
-            await _userOrganizationRepository.DeleteAsync(userOrg);
+            await _userOrganizationRepository.DeleteAsync(userOrg, cancellationToken);
 
             _logger.LogInformation("User {UserId} removed from organization {OrganizationId}", userId, organizationId);
             return ServiceResult.Success("User removed from organization successfully");
@@ -294,18 +294,18 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> DeactivateOrganizationUserAsync(Guid organizationId, Guid userId)
+    public async Task<ServiceResult> DeactivateOrganizationUserAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId, cancellationToken);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");
             }
 
             userOrg.Deactivate();
-            await _userOrganizationRepository.UpdateAsync(userOrg);
+            await _userOrganizationRepository.UpdateAsync(userOrg, cancellationToken);
 
             _logger.LogInformation("Organization user {UserId} deactivated in organization {OrganizationId}", userId, organizationId);
             return ServiceResult.Success("Organization user deactivated successfully");
@@ -317,18 +317,18 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> ActivateOrganizationUserAsync(Guid organizationId, Guid userId)
+    public async Task<ServiceResult> ActivateOrganizationUserAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId);
+            var userOrg = await _userOrganizationRepository.GetUserOrganizationAsync(userId, organizationId, cancellationToken);
             if (userOrg == null)
             {
                 return ServiceResult.Failure("User not found in organization");
             }
 
             userOrg.Activate();
-            await _userOrganizationRepository.UpdateAsync(userOrg);
+            await _userOrganizationRepository.UpdateAsync(userOrg, cancellationToken);
 
             _logger.LogInformation("Organization user {UserId} activated in organization {OrganizationId}", userId, organizationId);
             return ServiceResult.Success("Organization user activated successfully");

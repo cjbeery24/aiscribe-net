@@ -27,12 +27,12 @@ public class OrganizationService : IOrganizationService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(CreateOrganizationRequest request, Guid createdByUserId)
+    public async Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(CreateOrganizationRequest request, Guid createdByUserId, CancellationToken cancellationToken = default)
     {
         try
         {
             // Validate the creating user exists and is active
-            var creatingUser = await _userRepository.GetByIdAsync(createdByUserId);
+            var creatingUser = await _userRepository.GetByIdAsync(createdByUserId, cancellationToken);
             if (creatingUser == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Creating user not found");
@@ -44,7 +44,7 @@ public class OrganizationService : IOrganizationService
             }
 
             // Check if organization name already exists
-            var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name);
+            var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name, cancellationToken);
             if (existingOrganizations.Any(o => o.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 return ServiceResult<OrganizationResponse>.Failure($"An organization with the name '{request.Name}' already exists");
@@ -72,13 +72,13 @@ public class OrganizationService : IOrganizationService
             organization.UpdateSlug();
 
             // Check if slug already exists
-            if (await _organizationRepository.SlugExistsAsync(organization.Slug!))
+            if (await _organizationRepository.SlugExistsAsync(organization.Slug!, cancellationToken))
             {
                 return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists");
             }
 
             // Save organization
-            await _organizationRepository.AddAsync(organization);
+            await _organizationRepository.AddAsync(organization, cancellationToken);
 
             // Create user-organization relationship (user becomes admin)
             var userOrganization = new UserOrganization
@@ -94,7 +94,7 @@ public class OrganizationService : IOrganizationService
             organization.UserOrganizations.Add(userOrganization);
 
             // Update the organization to save the user-organization relationship
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization created: {OrganizationId} by user {UserId}", organization.Id, createdByUserId);
 
@@ -108,11 +108,11 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationAsync(Guid organizationId)
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Organization not found");
@@ -128,11 +128,11 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationBySlugAsync(string slug)
+    public async Task<ServiceResult<OrganizationResponse>> GetOrganizationBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetBySlugAsync(slug);
+            var organization = await _organizationRepository.GetBySlugAsync(slug, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Organization not found");
@@ -148,7 +148,7 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationListResponse>> GetOrganizationsAsync(OrganizationSearchRequest request)
+    public async Task<ServiceResult<OrganizationListResponse>> GetOrganizationsAsync(OrganizationSearchRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -163,17 +163,17 @@ public class OrganizationService : IOrganizationService
             if (request.IsActive == true)
             {
                 // Use repository method for active organizations
-                organizations = await _organizationRepository.GetActiveOrganizationsAsync();
+                organizations = await _organizationRepository.GetActiveOrganizationsAsync(cancellationToken);
             }
             else if (!string.IsNullOrWhiteSpace(request.SearchTerm))
             {
                 // Use repository method for name search
-                organizations = await _organizationRepository.SearchByNameAsync(request.SearchTerm);
+                organizations = await _organizationRepository.SearchByNameAsync(request.SearchTerm, cancellationToken);
             }
             else
             {
                 // Get all organizations
-                organizations = await _organizationRepository.GetAllAsync();
+                organizations = await _organizationRepository.GetAllAsync(cancellationToken);
             }
 
             // Apply additional filters that can't be done at database level
@@ -228,11 +228,11 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request)
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Organization not found");
@@ -242,7 +242,7 @@ public class OrganizationService : IOrganizationService
             if (!string.IsNullOrWhiteSpace(request.Name))
             {
                 // Check if new name conflicts with existing organization
-                var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name);
+                var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name, cancellationToken);
                 var conflictingOrg = existingOrganizations.FirstOrDefault(o =>
                     o.Id != organizationId &&
                     o.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase));
@@ -256,7 +256,7 @@ public class OrganizationService : IOrganizationService
                 organization.UpdateSlug();
 
                 // Check if new slug conflicts with existing organization
-                if (await _organizationRepository.SlugExistsAsync(organization.Slug!))
+                if (await _organizationRepository.SlugExistsAsync(organization.Slug!, cancellationToken))
                 {
                     return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists");
                 }
@@ -299,7 +299,7 @@ public class OrganizationService : IOrganizationService
 
             organization.UpdatedAt = DateTime.UtcNow;
 
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization updated: {OrganizationId}", organizationId);
 
@@ -313,22 +313,19 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request)
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Organization not found");
             }
 
             // Update settings if provided
-            if (request.MaxUsers.HasValue)
-                organization.MaxUsers = request.MaxUsers.Value;
-
-            if (request.MaxTranscriptionHours.HasValue)
-                organization.MaxTranscriptionHours = request.MaxTranscriptionHours.Value;
+            if (request.MaxTranscriptionMinutes.HasValue)
+                organization.MaxTranscriptionMinutes = request.MaxTranscriptionMinutes.Value;
 
             if (request.CanExportTranscriptions.HasValue)
                 organization.CanExportTranscriptions = request.CanExportTranscriptions.Value;
@@ -338,7 +335,7 @@ public class OrganizationService : IOrganizationService
 
             organization.UpdatedAt = DateTime.UtcNow;
 
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization settings updated: {OrganizationId}", organizationId);
 
@@ -352,18 +349,18 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request)
+    public async Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationResponse>.Failure("Organization not found");
             }
 
             organization.UpdateLogo(request.LogoUrl);
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization logo updated: {OrganizationId}", organizationId);
 
@@ -379,18 +376,18 @@ public class OrganizationService : IOrganizationService
 
 
 
-    public async Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId)
+    public async Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult.Failure("Organization not found");
             }
 
             organization.Activate();
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization activated: {OrganizationId}", organizationId);
             return ServiceResult.Success("Organization activated successfully");
@@ -402,18 +399,18 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId)
+    public async Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetByIdAsync(organizationId);
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult.Failure("Organization not found");
             }
 
             organization.Deactivate();
-            await _organizationRepository.UpdateAsync(organization);
+            await _organizationRepository.UpdateAsync(organization, cancellationToken);
 
             _logger.LogInformation("Organization deactivated: {OrganizationId}", organizationId);
             return ServiceResult.Success("Organization deactivated successfully");
@@ -425,11 +422,11 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId)
+    public async Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetWithUserOrganizationsAsync(organizationId);
+            var organization = await _organizationRepository.GetWithUserOrganizationsAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationWithUsersResponse>.Failure("Organization not found");
@@ -445,11 +442,11 @@ public class OrganizationService : IOrganizationService
         }
     }
 
-    public async Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId)
+    public async Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var organization = await _organizationRepository.GetWithSubscriptionsAsync(organizationId);
+            var organization = await _organizationRepository.GetWithSubscriptionsAsync(organizationId, cancellationToken);
             if (organization == null)
             {
                 return ServiceResult<OrganizationWithSubscriptionsResponse>.Failure("Organization not found");
@@ -485,8 +482,7 @@ public class OrganizationService : IOrganizationService
             CreatedAt = organization.CreatedAt,
             UpdatedAt = organization.UpdatedAt,
             IsActive = organization.IsActive,
-            MaxUsers = organization.MaxUsers,
-            MaxTranscriptionHours = organization.MaxTranscriptionHours,
+            MaxTranscriptionMinutes = organization.MaxTranscriptionMinutes,
             CanExportTranscriptions = organization.CanExportTranscriptions,
             HasRealtimeTranscription = organization.HasRealtimeTranscription,
             DisplayName = organization.DisplayName,
@@ -494,7 +490,6 @@ public class OrganizationService : IOrganizationService
             HasCompleteContactInfo = organization.HasCompleteContactInfo(),
             HasActiveSubscription = organization.HasActiveSubscription(),
             ActiveUserCount = organization.GetActiveUserCount(),
-            CanAddMoreUsers = organization.CanAddMoreUsers(),
             CanCreateTranscription = organization.CanCreateTranscription(),
             HasRealtimeTranscriptionEnabled = organization.HasRealtimeTranscriptionEnabled(),
             CanExportTranscriptionsEnabled = organization.CanExportTranscriptionsEnabled()
@@ -524,8 +519,7 @@ public class OrganizationService : IOrganizationService
             CreatedAt = baseResponse.CreatedAt,
             UpdatedAt = baseResponse.UpdatedAt,
             IsActive = baseResponse.IsActive,
-            MaxUsers = baseResponse.MaxUsers,
-            MaxTranscriptionHours = baseResponse.MaxTranscriptionHours,
+            MaxTranscriptionMinutes = baseResponse.MaxTranscriptionMinutes,
             CanExportTranscriptions = baseResponse.CanExportTranscriptions,
             HasRealtimeTranscription = baseResponse.HasRealtimeTranscription,
             DisplayName = baseResponse.DisplayName,
@@ -533,7 +527,6 @@ public class OrganizationService : IOrganizationService
             HasCompleteContactInfo = baseResponse.HasCompleteContactInfo,
             HasActiveSubscription = baseResponse.HasActiveSubscription,
             ActiveUserCount = baseResponse.ActiveUserCount,
-            CanAddMoreUsers = baseResponse.CanAddMoreUsers,
             CanCreateTranscription = baseResponse.CanCreateTranscription,
             HasRealtimeTranscriptionEnabled = baseResponse.HasRealtimeTranscriptionEnabled,
             CanExportTranscriptionsEnabled = baseResponse.CanExportTranscriptionsEnabled,
@@ -587,8 +580,7 @@ public class OrganizationService : IOrganizationService
             CreatedAt = baseResponse.CreatedAt,
             UpdatedAt = baseResponse.UpdatedAt,
             IsActive = baseResponse.IsActive,
-            MaxUsers = baseResponse.MaxUsers,
-            MaxTranscriptionHours = baseResponse.MaxTranscriptionHours,
+            MaxTranscriptionMinutes = baseResponse.MaxTranscriptionMinutes,
             CanExportTranscriptions = baseResponse.CanExportTranscriptions,
             HasRealtimeTranscription = baseResponse.HasRealtimeTranscription,
             DisplayName = baseResponse.DisplayName,
@@ -596,7 +588,6 @@ public class OrganizationService : IOrganizationService
             HasCompleteContactInfo = baseResponse.HasCompleteContactInfo,
             HasActiveSubscription = baseResponse.HasActiveSubscription,
             ActiveUserCount = baseResponse.ActiveUserCount,
-            CanAddMoreUsers = baseResponse.CanAddMoreUsers,
             CanCreateTranscription = baseResponse.CanCreateTranscription,
             HasRealtimeTranscriptionEnabled = baseResponse.HasRealtimeTranscriptionEnabled,
             CanExportTranscriptionsEnabled = baseResponse.CanExportTranscriptionsEnabled,
@@ -621,6 +612,7 @@ public class OrganizationService : IOrganizationService
         return new SubscriptionResponse
         {
             Id = subscription.Id,
+            OrganizationId = subscription.OrganizationId,
             Plan = subscription.Plan,
             Status = subscription.Status,
             StartDate = subscription.StartDate,
@@ -636,19 +628,17 @@ public class OrganizationService : IOrganizationService
             StripeSubscriptionId = subscription.StripeSubscriptionId,
             StripeCustomerId = subscription.StripeCustomerId,
             StripePriceId = subscription.StripePriceId,
-            MaxUsers = subscription.MaxUsers,
-            MaxTranscriptionHours = subscription.MaxTranscriptionHours,
+            MaxTranscriptionMinutes = subscription.MaxTranscriptionMinutes,
             CanExportTranscriptions = subscription.CanExportTranscriptions,
             HasRealtimeTranscription = subscription.HasRealtimeTranscription,
             HasPrioritySupport = subscription.HasPrioritySupport,
             CurrentUsers = subscription.CurrentUsers,
-            TranscriptionHoursUsed = subscription.TranscriptionHoursUsed,
+            TranscriptionMinutesUsed = subscription.TranscriptionMinutesUsed,
             UsageResetDate = subscription.UsageResetDate,
             IsActive = subscription.IsActive,
             IsExpired = subscription.IsExpired,
             IsCancelled = subscription.IsCancelled,
-            RemainingUsers = subscription.RemainingUsers,
-            RemainingTranscriptionHours = subscription.RemainingTranscriptionHours,
+            RemainingTranscriptionMinutes = subscription.RemainingTranscriptionMinutes,
             PlanName = subscription.Plan.ToString()
         };
     }
@@ -665,7 +655,6 @@ public class OrganizationService : IOrganizationService
             CreatedAt = organization.CreatedAt,
             IsActive = organization.IsActive,
             ActiveUserCount = organization.GetActiveUserCount(),
-            MaxUsers = organization.MaxUsers,
             HasActiveSubscription = organization.HasActiveSubscription()
         };
     }

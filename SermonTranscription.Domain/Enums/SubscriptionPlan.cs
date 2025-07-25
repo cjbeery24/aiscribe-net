@@ -6,22 +6,17 @@ namespace SermonTranscription.Domain.Enums;
 public enum SubscriptionPlan
 {
     /// <summary>
-    /// Free tier with limited features
-    /// </summary>
-    Free = 0,
-    
-    /// <summary>
     /// Basic tier for small organizations
     /// </summary>
-    Basic = 1,
-    
+    Basic = 0,
+
     /// <summary>
     /// Professional tier for growing organizations
     /// </summary>
-    Professional = 2,
-    
+    Professional = 1,
+
     /// <summary>
     /// Enterprise tier for large organizations
     /// </summary>
-    Enterprise = 3
-} 
+    Enterprise = 2
+}

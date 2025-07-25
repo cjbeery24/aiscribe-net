@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SermonTranscription.Api.Authorization;
 
@@ -6,6 +6,6 @@ namespace SermonTranscription.Api.Authorization;
 /// Marks an endpoint as public - no authentication or tenant context required
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
-public class PublicEndpointAttribute : Attribute
+public class PublicEndpointAttribute : AllowAnonymousAttribute
 {
 }

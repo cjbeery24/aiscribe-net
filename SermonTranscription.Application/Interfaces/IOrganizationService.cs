@@ -8,15 +8,15 @@ namespace SermonTranscription.Application.Interfaces;
 /// </summary>
 public interface IOrganizationService
 {
-    Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(CreateOrganizationRequest request, Guid createdByUserId);
-    Task<ServiceResult<OrganizationResponse>> GetOrganizationAsync(Guid organizationId);
-    Task<ServiceResult<OrganizationResponse>> GetOrganizationBySlugAsync(string slug);
-    Task<ServiceResult<OrganizationListResponse>> GetOrganizationsAsync(OrganizationSearchRequest request);
-    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request);
-    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request);
-    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request);
-    Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId);
-    Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId);
-    Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId);
-    Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId);
+    Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(CreateOrganizationRequest request, Guid createdByUserId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationResponse>> GetOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationResponse>> GetOrganizationBySlugAsync(string slug, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationListResponse>> GetOrganizationsAsync(OrganizationSearchRequest request, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationSettingsAsync(Guid organizationId, UpdateOrganizationSettingsRequest request, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationResponse>> UpdateOrganizationLogoAsync(Guid organizationId, UpdateOrganizationLogoRequest request, CancellationToken cancellationToken = default);
+    Task<ServiceResult> ActivateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<ServiceResult> DeactivateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationWithUsersResponse>> GetOrganizationWithUsersAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<OrganizationWithSubscriptionsResponse>> GetOrganizationWithSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }

@@ -25,11 +25,7 @@ public static class TestDataFactory
         .RuleFor(o => o.WebsiteUrl, f => f.Internet.Url())
         .RuleFor(o => o.CreatedAt, f => f.Date.Past())
         .RuleFor(o => o.UpdatedAt, (f, o) => f.Date.Between(o.CreatedAt, DateTime.UtcNow))
-        .RuleFor(o => o.IsActive, f => f.Random.Bool(0.9f))
-        .RuleFor(o => o.MaxUsers, f => f.Random.Int(5, 100))
-        .RuleFor(o => o.MaxTranscriptionHours, f => f.Random.Int(10, 1000))
-        .RuleFor(o => o.CanExportTranscriptions, f => f.Random.Bool(0.8f))
-        .RuleFor(o => o.HasRealtimeTranscription, f => f.Random.Bool(0.7f));
+        .RuleFor(o => o.IsActive, f => f.Random.Bool(0.9f));
 
     /// <summary>
     /// Generate a fake User with realistic data
@@ -109,8 +105,7 @@ public static class TestDataFactory
         .RuleFor(s => s.Currency, f => "USD")
         .RuleFor(s => s.StripeCustomerId, f => $"cus_{f.Random.AlphaNumeric(24)}")
         .RuleFor(s => s.StripeSubscriptionId, f => $"sub_{f.Random.AlphaNumeric(24)}")
-        .RuleFor(s => s.MaxUsers, (f, s) => GetMaxUsersForPlan(s.Plan))
-        .RuleFor(s => s.MaxTranscriptionHours, (f, s) => GetMaxHoursForPlan(s.Plan))
+        .RuleFor(s => s.MaxTranscriptionMinutes, (f, s) => GetMaxMinutesForPlan(s.Plan))
         .RuleFor(s => s.CanExportTranscriptions, (f, s) => s.Plan != SubscriptionPlan.Basic)
         .RuleFor(s => s.CreatedAt, f => f.Date.Past())
         .RuleFor(s => s.UpdatedAt, (f, s) => f.Date.Between(s.CreatedAt, DateTime.UtcNow))
@@ -132,26 +127,18 @@ public static class TestDataFactory
     // Helper methods for subscription plans
     private static decimal GetPriceForPlan(SubscriptionPlan plan) => plan switch
     {
-        SubscriptionPlan.Basic => 29.99m,
-        SubscriptionPlan.Professional => 79.99m,
-        SubscriptionPlan.Enterprise => 199.99m,
+        SubscriptionPlan.Basic => 48.00m,
+        SubscriptionPlan.Professional => 80.00m,
+        SubscriptionPlan.Enterprise => 112.00m,
         _ => 0m
     };
 
-    private static int GetMaxUsersForPlan(SubscriptionPlan plan) => plan switch
+    private static int GetMaxMinutesForPlan(SubscriptionPlan plan) => plan switch
     {
-        SubscriptionPlan.Basic => 5,
-        SubscriptionPlan.Professional => 25,
-        SubscriptionPlan.Enterprise => 100,
-        _ => 1
-    };
-
-    private static int GetMaxHoursForPlan(SubscriptionPlan plan) => plan switch
-    {
-        SubscriptionPlan.Basic => 10,
-        SubscriptionPlan.Professional => 50,
-        SubscriptionPlan.Enterprise => 200,
-        _ => 1
+        SubscriptionPlan.Basic => 360,
+        SubscriptionPlan.Professional => 600,
+        SubscriptionPlan.Enterprise => 840,
+        _ => 60
     };
 
     /// <summary>
@@ -168,7 +155,7 @@ public static class TestDataFactory
         {
             var user = users[i];
             var role = i == 0 ? UserRole.OrganizationAdmin : UserRole.OrganizationUser; // First user is admin
-            
+
             var userOrganization = new UserOrganization
             {
                 UserId = user.Id,
@@ -179,7 +166,7 @@ public static class TestDataFactory
                 User = user,
                 Organization = organization
             };
-            
+
             userOrganizations.Add(userOrganization);
             user.UserOrganizations.Add(userOrganization);
         }
@@ -209,7 +196,7 @@ public static class TestDataFactory
             IsActive = true,
             User = user
         };
-        
+
         user.UserOrganizations.Add(membership);
         return (user, membership);
     }
@@ -218,8 +205,8 @@ public static class TestDataFactory
     /// Create a transcription session with related transcriptions
     /// </summary>
     public static (TranscriptionSession session, List<Transcription> transcriptions) CreateSessionWithTranscriptions(
-        Guid organizationId, 
-        Guid userId, 
+        Guid organizationId,
+        Guid userId,
         int transcriptionCount = 2)
     {
         var session = TranscriptionSessionFaker.Generate();
@@ -238,4 +225,4 @@ public static class TestDataFactory
         session.Transcriptions = transcriptions;
         return (session, transcriptions);
     }
-} 
+}

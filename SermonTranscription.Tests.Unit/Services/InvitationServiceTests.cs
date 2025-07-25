@@ -67,19 +67,19 @@ public class InvitationServiceTests
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         _mockUserRepository
-            .Setup(x => x.GetByIdAsync(invitedByUserId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(invitedByUserId, CancellationToken.None))
             .ReturnsAsync(invitingUser);
 
         _mockUserRepository
-            .Setup(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None))
             .ReturnsAsync((User user, CancellationToken token) => user);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.AddAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None))
             .ReturnsAsync((UserOrganization userOrganization, CancellationToken token) => userOrganization);
 
         _mockEmailService
@@ -101,8 +101,8 @@ public class InvitationServiceTests
         Assert.Equal(request.Email, result.Email);
         Assert.NotNull(result.InvitationToken);
 
-        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
-        _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
+        _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
         _mockEmailService.Verify(x => x.SendInvitationEmailAsync(
             It.IsAny<string>(),
             It.IsAny<string>(),
@@ -143,23 +143,23 @@ public class InvitationServiceTests
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync(existingUser);
 
         _mockUserRepository
-            .Setup(x => x.GetByIdAsync(invitedByUserId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(invitedByUserId, CancellationToken.None))
             .ReturnsAsync(invitingUser);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetUserOrganizationAsync(existingUser.Id, organizationId))
+            .Setup(x => x.GetUserOrganizationAsync(existingUser.Id, organizationId, CancellationToken.None))
             .ReturnsAsync((UserOrganization?)null);
 
         _mockUserRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.AddAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None))
             .ReturnsAsync((UserOrganization userOrganization, CancellationToken token) => userOrganization);
 
         _mockEmailService
@@ -181,8 +181,8 @@ public class InvitationServiceTests
         Assert.Equal(request.Email, result.Email);
         Assert.NotNull(result.InvitationToken);
 
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
+        _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -213,11 +213,11 @@ public class InvitationServiceTests
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync(existingUser);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetUserOrganizationAsync(existingUser.Id, organizationId))
+            .Setup(x => x.GetUserOrganizationAsync(existingUser.Id, organizationId, CancellationToken.None))
             .ReturnsAsync(existingMembership);
 
         // Act
@@ -299,11 +299,11 @@ public class InvitationServiceTests
         var invitedByUserId = Guid.NewGuid();
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         _mockUserRepository
-            .Setup(x => x.GetByIdAsync(invitedByUserId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(invitedByUserId, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act & Assert
@@ -346,19 +346,19 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync(userOrganization);
 
         _mockUserRepository
-            .Setup(x => x.GetByIdAsync(userOrganization.UserId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(userOrganization.UserId, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockUserRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(It.IsAny<UserOrganization>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockPasswordHasher
@@ -391,8 +391,8 @@ public class InvitationServiceTests
         Assert.Equal("access_token", result.AccessToken);
         Assert.Equal("refresh_token", result.RefreshToken);
 
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
-        _mockUserOrganizationRepository.Verify(x => x.UpdateAsync(It.IsAny<UserOrganization>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
+        _mockUserOrganizationRepository.Verify(x => x.UpdateAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
         _mockPasswordHasher.Verify(x => x.HashPassword(request.Password), Times.Once);
         _mockEmailService.Verify(x => x.SendWelcomeEmailAsync(
             It.IsAny<string>(),
@@ -411,7 +411,7 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync((UserOrganization?)null);
 
         // Act
@@ -444,7 +444,7 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync(userOrganization);
 
         // Act
@@ -478,7 +478,7 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync(userOrganization);
 
         // Act
@@ -512,7 +512,7 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync(userOrganization);
 
         _mockPasswordValidator
@@ -547,11 +547,11 @@ public class InvitationServiceTests
         };
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken))
+            .Setup(x => x.GetByInvitationTokenAsync(request.InvitationToken, CancellationToken.None))
             .ReturnsAsync(userOrganization);
 
         _mockUserRepository
-            .Setup(x => x.GetByIdAsync(userOrganization.UserId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdAsync(userOrganization.UserId, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act & Assert

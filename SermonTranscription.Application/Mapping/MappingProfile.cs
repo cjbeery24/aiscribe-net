@@ -36,5 +36,14 @@ public class MappingProfile : Profile
         CreateMap<Organization, OrganizationResponse>()
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt))
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => src.UpdatedAt));
+
+        // Subscription to SubscriptionResponse mapping
+        CreateMap<Subscription, SubscriptionResponse>()
+            .ForMember(dest => dest.OrganizationId, opt => opt.MapFrom(src => src.OrganizationId))
+            .ForMember(dest => dest.PlanName, opt => opt.MapFrom(src => src.Plan.ToString()))
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+            .ForMember(dest => dest.IsExpired, opt => opt.MapFrom(src => src.IsExpired))
+            .ForMember(dest => dest.IsCancelled, opt => opt.MapFrom(src => src.IsCancelled))
+            .ForMember(dest => dest.RemainingTranscriptionMinutes, opt => opt.MapFrom(src => src.RemainingTranscriptionMinutes));
     }
 }

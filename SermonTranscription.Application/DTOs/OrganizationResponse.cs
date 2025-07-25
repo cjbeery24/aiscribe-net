@@ -23,8 +23,7 @@ public class OrganizationResponse
     public bool IsActive { get; set; }
 
     // Subscription settings
-    public int MaxUsers { get; set; }
-    public int MaxTranscriptionHours { get; set; }
+    public int MaxTranscriptionMinutes { get; set; }
     public bool CanExportTranscriptions { get; set; }
     public bool HasRealtimeTranscription { get; set; }
 
@@ -34,7 +33,6 @@ public class OrganizationResponse
     public bool HasCompleteContactInfo { get; set; }
     public bool HasActiveSubscription { get; set; }
     public int ActiveUserCount { get; set; }
-    public bool CanAddMoreUsers { get; set; }
     public bool CanCreateTranscription { get; set; }
     public bool HasRealtimeTranscriptionEnabled { get; set; }
     public bool CanExportTranscriptionsEnabled { get; set; }

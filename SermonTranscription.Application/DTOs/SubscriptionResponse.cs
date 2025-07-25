@@ -8,6 +8,7 @@ namespace SermonTranscription.Application.DTOs;
 public class SubscriptionResponse
 {
     public Guid Id { get; set; }
+    public Guid OrganizationId { get; set; }
     public SubscriptionPlan Plan { get; set; }
     public SubscriptionStatus Status { get; set; }
 
@@ -31,23 +32,21 @@ public class SubscriptionResponse
     public string? StripePriceId { get; set; }
 
     // Plan limits
-    public int MaxUsers { get; set; }
-    public int MaxTranscriptionHours { get; set; }
+    public int MaxTranscriptionMinutes { get; set; }
     public bool CanExportTranscriptions { get; set; }
     public bool HasRealtimeTranscription { get; set; }
     public bool HasPrioritySupport { get; set; }
 
     // Usage tracking
     public int CurrentUsers { get; set; }
-    public int TranscriptionHoursUsed { get; set; }
+    public int TranscriptionMinutesUsed { get; set; }
     public DateTime UsageResetDate { get; set; }
 
     // Computed properties
     public bool IsActive { get; set; }
     public bool IsExpired { get; set; }
     public bool IsCancelled { get; set; }
-    public int RemainingUsers { get; set; }
-    public int RemainingTranscriptionHours { get; set; }
+    public int RemainingTranscriptionMinutes { get; set; }
 
     // Plan name
     public string PlanName { get; set; } = string.Empty;

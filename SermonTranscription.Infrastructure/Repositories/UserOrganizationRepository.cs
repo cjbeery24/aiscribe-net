@@ -18,112 +18,112 @@ public class UserOrganizationRepository : BaseRepository<UserOrganization>, IUse
     /// <summary>
     /// Get user's membership in a specific organization
     /// </summary>
-    public async Task<UserOrganization?> GetUserOrganizationAsync(Guid userId, Guid organizationId)
+    public async Task<UserOrganization?> GetUserOrganizationAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.User)
             .Include(uo => uo.Organization)
-            .FirstOrDefaultAsync(uo => uo.UserId == userId && uo.OrganizationId == organizationId);
+            .FirstOrDefaultAsync(uo => uo.UserId == userId && uo.OrganizationId == organizationId, cancellationToken);
     }
 
     /// <summary>
     /// Get all organizations where user is active
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetUserOrganizationsAsync(Guid userId)
+    public async Task<IEnumerable<UserOrganization>> GetUserOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.Organization)
             .Where(uo => uo.UserId == userId && uo.IsActive)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
     /// Get all active users in an organization
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetOrganizationUsersAsync(Guid organizationId)
+    public async Task<IEnumerable<UserOrganization>> GetOrganizationUsersAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.User)
             .Where(uo => uo.OrganizationId == organizationId && uo.IsActive)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
     /// Get users in an organization with specific role
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetOrganizationUsersByRoleAsync(Guid organizationId, UserRole role)
+    public async Task<IEnumerable<UserOrganization>> GetOrganizationUsersByRoleAsync(Guid organizationId, UserRole role, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.User)
             .Where(uo => uo.OrganizationId == organizationId && uo.Role == role && uo.IsActive)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
     /// Get admin users in an organization
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetOrganizationAdminsAsync(Guid organizationId)
+    public async Task<IEnumerable<UserOrganization>> GetOrganizationAdminsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        return await GetOrganizationUsersByRoleAsync(organizationId, UserRole.OrganizationAdmin);
+        return await GetOrganizationUsersByRoleAsync(organizationId, UserRole.OrganizationAdmin, cancellationToken);
     }
 
     /// <summary>
     /// Check if user is member of organization
     /// </summary>
-    public async Task<bool> IsUserMemberOfOrganizationAsync(Guid userId, Guid organizationId)
+    public async Task<bool> IsUserMemberOfOrganizationAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
-            .AnyAsync(uo => uo.UserId == userId && uo.OrganizationId == organizationId && uo.IsActive);
+            .AnyAsync(uo => uo.UserId == userId && uo.OrganizationId == organizationId && uo.IsActive, cancellationToken);
     }
 
     /// <summary>
     /// Get pending invitations for a user
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetPendingInvitationsAsync(Guid userId)
+    public async Task<IEnumerable<UserOrganization>> GetPendingInvitationsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.Organization)
             .Where(uo => uo.UserId == userId && !uo.InvitationAcceptedAt.HasValue)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
     /// Get pending invitations for an organization
     /// </summary>
-    public async Task<IEnumerable<UserOrganization>> GetOrganizationPendingInvitationsAsync(Guid organizationId)
+    public async Task<IEnumerable<UserOrganization>> GetOrganizationPendingInvitationsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.User)
             .Where(uo => uo.OrganizationId == organizationId && !uo.InvitationAcceptedAt.HasValue)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
     /// Get user-organization relationship by invitation token
     /// </summary>
-    public async Task<UserOrganization?> GetByInvitationTokenAsync(string invitationToken)
+    public async Task<UserOrganization?> GetByInvitationTokenAsync(string invitationToken, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
             .Include(uo => uo.User)
             .Include(uo => uo.Organization)
-            .FirstOrDefaultAsync(uo => uo.InvitationToken == invitationToken);
+            .FirstOrDefaultAsync(uo => uo.InvitationToken == invitationToken, cancellationToken);
     }
 
     /// <summary>
     /// Get count of active users in organization
     /// </summary>
-    public async Task<int> GetActiveUserCountAsync(Guid organizationId)
+    public async Task<int> GetActiveUserCountAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
-            .CountAsync(uo => uo.OrganizationId == organizationId && uo.IsActive);
+            .CountAsync(uo => uo.OrganizationId == organizationId && uo.IsActive, cancellationToken);
     }
 
     /// <summary>
     /// Get count of organizations for user
     /// </summary>
-    public async Task<int> GetUserOrganizationCountAsync(Guid userId)
+    public async Task<int> GetUserOrganizationCountAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.UserOrganizations
-            .CountAsync(uo => uo.UserId == userId && uo.IsActive);
+            .CountAsync(uo => uo.UserId == userId && uo.IsActive, cancellationToken);
     }
 }

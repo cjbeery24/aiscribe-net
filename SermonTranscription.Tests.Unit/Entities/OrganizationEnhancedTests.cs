@@ -143,79 +143,19 @@ public class OrganizationEnhancedTests : BaseUnitTest
     }
 
     [Fact]
-    public void Organization_CanAddMoreUsers_ShouldReturnTrue_WhenUnderLimit()
-    {
-        // Arrange
-        var organization = TestDataFactory.OrganizationFaker.Generate();
-        organization.MaxUsers = 5;
-
-        // Act
-        var canAdd = organization.CanAddMoreUsers();
-
-        // Assert
-        canAdd.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Organization_CanAddMoreUsers_ShouldReturnFalse_WhenAtLimit()
-    {
-        // Arrange
-        var organization = TestDataFactory.OrganizationFaker.Generate();
-        organization.MaxUsers = 2;
-
-        var user1 = TestDataFactory.UserFaker.Generate();
-        user1.IsActive = true;
-        var user2 = TestDataFactory.UserFaker.Generate();
-        user2.IsActive = true;
-
-        // Create UserOrganization entities with proper navigation properties
-        var userOrg1 = new UserOrganization
-        {
-            UserId = user1.Id,
-            OrganizationId = organization.Id,
-            Role = UserRole.OrganizationUser,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            User = user1,
-            Organization = organization
-        };
-        var userOrg2 = new UserOrganization
-        {
-            UserId = user2.Id,
-            OrganizationId = organization.Id,
-            Role = UserRole.OrganizationUser,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            User = user2,
-            Organization = organization
-        };
-
-        organization.UserOrganizations.Add(userOrg1);
-        organization.UserOrganizations.Add(userOrg2);
-
-        // Act
-        var canAdd = organization.CanAddMoreUsers();
-
-        // Assert
-        canAdd.Should().BeFalse();
-    }
-
-    [Fact]
     public void Organization_UpdateSubscriptionLimits_ShouldUpdateAllLimits()
     {
         // Arrange
         var organization = TestDataFactory.OrganizationFaker.Generate();
-        var originalMaxUsers = organization.MaxUsers;
-        var originalMaxHours = organization.MaxTranscriptionHours;
+        var originalMaxMinutes = organization.MaxTranscriptionMinutes;
         var originalCanExport = organization.CanExportTranscriptions;
         var originalHasRealtime = organization.HasRealtimeTranscription;
 
         // Act
-        organization.UpdateSubscriptionLimits(10, 50, true, false);
+        organization.UpdateSubscriptionLimits(3000, true, false);
 
         // Assert
-        organization.MaxUsers.Should().Be(10);
-        organization.MaxTranscriptionHours.Should().Be(50);
+        organization.MaxTranscriptionMinutes.Should().Be(3000);
         organization.CanExportTranscriptions.Should().BeTrue();
         organization.HasRealtimeTranscription.Should().BeFalse();
         organization.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
@@ -379,50 +319,6 @@ public class OrganizationEnhancedTests : BaseUnitTest
         var act = () => organization.ValidateIsActive();
         act.Should().Throw<OrganizationInactiveException>()
            .WithMessage($"Organization {organization.Name} is not active.");
-    }
-
-    [Fact]
-    public void Organization_ValidateCanAddUser_ShouldThrowException_WhenAtUserLimit()
-    {
-        // Arrange
-        var organization = TestDataFactory.OrganizationFaker.Generate();
-        organization.IsActive = true; // Must be active to test user limit validation
-        organization.MaxUsers = 1;
-
-        var existingUser = TestDataFactory.UserFaker.Generate();
-        existingUser.IsActive = true;
-
-        // Create UserOrganization entity with proper navigation properties
-        var userOrg = new UserOrganization
-        {
-            UserId = existingUser.Id,
-            OrganizationId = organization.Id,
-            Role = UserRole.OrganizationUser,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            User = existingUser,
-            Organization = organization
-        };
-
-        organization.UserOrganizations.Add(userOrg);
-
-        // Act & Assert
-        var act = () => organization.ValidateCanAddUser();
-        act.Should().Throw<OrganizationUserLimitException>()
-            .WithMessage("*maximum number of users*");
-    }
-
-    [Fact]
-    public void Organization_ValidateHasActiveSubscription_ShouldThrowException_WhenNoActiveSubscription()
-    {
-        // Arrange
-        var organization = TestDataFactory.OrganizationFaker.Generate();
-        organization.Subscriptions.Clear();
-
-        // Act & Assert
-        var act = () => organization.ValidateHasActiveSubscription();
-        act.Should().Throw<OrganizationSubscriptionLimitException>()
-           .WithMessage($"Organization {organization.Name} does not have an active subscription.");
     }
 
     [Fact]

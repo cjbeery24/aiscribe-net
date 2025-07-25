@@ -37,7 +37,7 @@ public class UsersController : BaseAuthenticatedApiController
         {
             var userId = HttpContext.GetUserId()!.Value;
 
-            var result = await _userService.GetUserProfileAsync(userId);
+            var result = await _userService.GetUserProfileAsync(userId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -63,7 +63,7 @@ public class UsersController : BaseAuthenticatedApiController
         {
             var userId = HttpContext.GetUserId()!.Value;
 
-            var result = await _userService.UpdateUserProfileAsync(userId, request);
+            var result = await _userService.UpdateUserProfileAsync(userId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -88,7 +88,7 @@ public class UsersController : BaseAuthenticatedApiController
         {
             var userId = HttpContext.GetUserId()!.Value;
 
-            var result = await _userService.ChangePasswordAsync(userId, request);
+            var result = await _userService.ChangePasswordAsync(userId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
@@ -113,7 +113,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.GetOrganizationUsersAsync(tenantContext.OrganizationId, request);
+            var result = await _userService.GetOrganizationUsersAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -139,7 +139,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.GetOrganizationUserAsync(tenantContext.OrganizationId, userId);
+            var result = await _userService.GetOrganizationUserAsync(tenantContext.OrganizationId, userId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -167,7 +167,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.UpdateOrganizationUserRoleAsync(tenantContext.OrganizationId, userId, request);
+            var result = await _userService.UpdateOrganizationUserRoleAsync(tenantContext.OrganizationId, userId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -193,7 +193,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.RemoveUserFromOrganizationAsync(tenantContext.OrganizationId, userId);
+            var result = await _userService.RemoveUserFromOrganizationAsync(tenantContext.OrganizationId, userId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
@@ -219,7 +219,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.DeactivateOrganizationUserAsync(tenantContext.OrganizationId, userId);
+            var result = await _userService.DeactivateOrganizationUserAsync(tenantContext.OrganizationId, userId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
@@ -245,7 +245,7 @@ public class UsersController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _userService.ActivateOrganizationUserAsync(tenantContext.OrganizationId, userId);
+            var result = await _userService.ActivateOrganizationUserAsync(tenantContext.OrganizationId, userId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)

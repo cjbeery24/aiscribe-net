@@ -42,7 +42,7 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -91,14 +91,14 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         _httpContext.Items["UserContext"] = userContext;
 
         _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
     }
 
     private static Endpoint CreateEndpointWithAttribute<T>() where T : Attribute, new()

@@ -88,7 +88,7 @@ public abstract class BaseRepository<T> : IBaseRepository<T> where T : class
     {
         if (predicate == null)
             return await _dbSet.CountAsync(cancellationToken);
-        
+
         return await _dbSet.CountAsync(predicate, cancellationToken);
     }
 
@@ -109,4 +109,4 @@ public abstract class BaseRepository<T> : IBaseRepository<T> where T : class
     {
         return await _context.SaveChangesAsync(cancellationToken);
     }
-} 
+}

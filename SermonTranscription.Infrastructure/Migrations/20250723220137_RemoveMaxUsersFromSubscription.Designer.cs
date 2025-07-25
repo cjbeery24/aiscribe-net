@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SermonTranscription.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SermonTranscription.Infrastructure.Data;
 namespace SermonTranscription.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250723220137_RemoveMaxUsersFromSubscription")]
+    partial class RemoveMaxUsersFromSubscription
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -64,7 +67,7 @@ namespace SermonTranscription.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<int>("MaxTranscriptionMinutes")
+                    b.Property<int>("MaxTranscriptionHours")
                         .HasColumnType("integer");
 
                     b.Property<string>("Name")
@@ -112,7 +115,7 @@ namespace SermonTranscription.Infrastructure.Migrations
                             Description = "Default organization for development",
                             HasRealtimeTranscription = true,
                             IsActive = true,
-                            MaxTranscriptionMinutes = 600,
+                            MaxTranscriptionHours = 10,
                             Name = "Default Organization",
                             Slug = "default"
                         });
@@ -187,7 +190,7 @@ namespace SermonTranscription.Infrastructure.Migrations
                     b.Property<DateTime?>("LastBillingDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("MaxTranscriptionMinutes")
+                    b.Property<int>("MaxTranscriptionHours")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("MonthlyPrice")
@@ -222,7 +225,7 @@ namespace SermonTranscription.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<int>("TranscriptionMinutesUsed")
+                    b.Property<int>("TranscriptionHoursUsed")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")

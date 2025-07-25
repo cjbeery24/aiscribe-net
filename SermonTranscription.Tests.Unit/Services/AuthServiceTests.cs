@@ -53,11 +53,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         _mockUserRepository
-            .Setup(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None))
             .ReturnsAsync((User user, CancellationToken token) => user);
 
         _mockPasswordHasher
@@ -70,7 +70,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("User registered successfully. Please check your email to verify your account.", result.Message);
-        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockPasswordHasher.Verify(x => x.HashPassword(request.Password), Times.Once);
     }
 
@@ -88,7 +88,7 @@ public class AuthServiceTests : BaseUnitTest
 
         var existingUser = new User { Email = request.Email };
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(request.Email, CancellationToken.None))
             .ReturnsAsync(existingUser);
 
         // Act
@@ -97,7 +97,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal("User with this email already exists", result.Message);
-        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -126,11 +126,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetUserOrganizationsAsync(user.Id))
+            .Setup(x => x.GetUserOrganizationsAsync(user.Id, CancellationToken.None))
             .ReturnsAsync(new List<UserOrganization> { userOrg });
 
         _mockJwtService
@@ -165,7 +165,7 @@ public class AuthServiceTests : BaseUnitTest
         var password = "password123";
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -194,7 +194,7 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -226,7 +226,7 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
@@ -250,11 +250,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockUserRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -263,7 +263,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -273,7 +273,7 @@ public class AuthServiceTests : BaseUnitTest
         var email = "nonexistent@example.com";
 
         _mockUserRepository
-            .Setup(x => x.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -282,7 +282,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -301,11 +301,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockUserRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockPasswordHasher
@@ -318,7 +318,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("Password has been successfully reset", result.Message);
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockPasswordHasher.Verify(x => x.HashPassword(newPassword), Times.Once);
     }
 
@@ -330,7 +330,7 @@ public class AuthServiceTests : BaseUnitTest
         var newPassword = "newpassword123";
 
         _mockUserRepository
-            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -339,7 +339,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal("Invalid or expired reset token", result.Message);
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -358,7 +358,7 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
@@ -367,7 +367,7 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal("Reset token has expired", result.Message);
-        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     [Fact]
@@ -466,7 +466,7 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetByPasswordResetTokenAsync(token, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByPasswordResetTokenAsync(token, CancellationToken.None))
             .ReturnsAsync(user);
 
         _mockPasswordValidator
@@ -499,7 +499,7 @@ public class AuthServiceTests : BaseUnitTest
         var invalidToken = "invalid_refresh_token";
 
         _mockUserRepository
-            .Setup(x => x.GetRefreshTokenAsync(invalidToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetRefreshTokenAsync(invalidToken, CancellationToken.None))
             .ReturnsAsync((RefreshToken?)null);
 
         // Act
@@ -550,11 +550,11 @@ public class AuthServiceTests : BaseUnitTest
         var newRefreshToken = "new_refresh_token";
 
         _mockUserRepository
-            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, CancellationToken.None))
             .ReturnsAsync(storedRefreshToken);
 
         _mockUserOrganizationRepository
-            .Setup(x => x.GetUserOrganizationsAsync(userId))
+            .Setup(x => x.GetUserOrganizationsAsync(userId, CancellationToken.None))
             .ReturnsAsync(new List<UserOrganization> { membership });
 
         _mockJwtService
@@ -566,15 +566,15 @@ public class AuthServiceTests : BaseUnitTest
             .Returns(newRefreshToken);
 
         _mockUserRepository
-            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockUserRepository
-            .Setup(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         _mockUserRepository
-            .Setup(x => x.UpdateAsync(user, It.IsAny<CancellationToken>()))
+            .Setup(x => x.UpdateAsync(user, CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -589,9 +589,9 @@ public class AuthServiceTests : BaseUnitTest
         // Note: OrganizationId and Role are no longer included in AuthUserInfo
         // as they're determined per-request via X-Organization-ID header
 
-        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
-        _mockUserRepository.Verify(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
-        _mockUserRepository.Verify(x => x.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
+        _mockUserRepository.Verify(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), CancellationToken.None), Times.Once);
+        _mockUserRepository.Verify(x => x.UpdateAsync(user, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -619,11 +619,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, CancellationToken.None))
             .ReturnsAsync(storedRefreshToken);
 
         _mockUserRepository
-            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -633,7 +633,7 @@ public class AuthServiceTests : BaseUnitTest
         Assert.False(result.IsSuccess);
         Assert.Equal("Refresh token has expired", result.Message);
 
-        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -662,7 +662,7 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, CancellationToken.None))
             .ReturnsAsync(storedRefreshToken);
 
         // Act
@@ -698,11 +698,11 @@ public class AuthServiceTests : BaseUnitTest
         };
 
         _mockUserRepository
-            .Setup(x => x.GetRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetRefreshTokenAsync(refreshToken, CancellationToken.None))
             .ReturnsAsync(storedRefreshToken);
 
         _mockUserRepository
-            .Setup(x => x.RevokeAllUserRefreshTokensAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.RevokeAllUserRefreshTokensAsync(userId, CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -712,7 +712,7 @@ public class AuthServiceTests : BaseUnitTest
         Assert.False(result.IsSuccess);
         Assert.Equal("User account is deactivated", result.Message);
 
-        _mockUserRepository.Verify(x => x.RevokeAllUserRefreshTokensAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.RevokeAllUserRefreshTokensAsync(userId, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -722,7 +722,7 @@ public class AuthServiceTests : BaseUnitTest
         var refreshToken = "valid_refresh_token";
 
         _mockUserRepository
-            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -732,7 +732,7 @@ public class AuthServiceTests : BaseUnitTest
         Assert.True(result.IsSuccess);
         Assert.Equal("Refresh token revoked successfully", result.Message);
 
-        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
     }
 
     [Fact]

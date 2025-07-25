@@ -50,7 +50,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
                 });
             }
 
-            var result = await _organizationService.CreateOrganizationAsync(request, userId.Value);
+            var result = await _organizationService.CreateOrganizationAsync(request, userId.Value, HttpContext.RequestAborted);
             return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -73,7 +73,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId);
+            var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
             return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -103,7 +103,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
             if (validationResult != null) return validationResult;
 
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request);
+            var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -132,7 +132,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
             if (validationResult != null) return validationResult;
 
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request);
+            var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -161,7 +161,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
             if (validationResult != null) return validationResult;
 
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request);
+            var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -186,7 +186,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.ActivateOrganizationAsync(tenantContext.OrganizationId);
+            var result = await _organizationService.ActivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
@@ -211,7 +211,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.DeactivateOrganizationAsync(tenantContext.OrganizationId);
+            var result = await _organizationService.DeactivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
         }
         catch (Exception ex)
@@ -235,7 +235,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId);
+            var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)
@@ -259,7 +259,7 @@ public class OrganizationsController : BaseAuthenticatedApiController
         try
         {
             var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId);
+            var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
             return HandleServiceResult(result, () => Ok(result.Data));
         }
         catch (Exception ex)

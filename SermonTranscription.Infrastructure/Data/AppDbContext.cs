@@ -232,8 +232,7 @@ public class AppDbContext : DbContext
                 ContactEmail = "admin@example.com",
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 IsActive = true,
-                MaxUsers = 5,
-                MaxTranscriptionHours = 10,
+                MaxTranscriptionMinutes = 600,
                 CanExportTranscriptions = true,
                 HasRealtimeTranscription = true
             }

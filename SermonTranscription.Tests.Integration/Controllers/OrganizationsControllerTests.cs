@@ -254,8 +254,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
 
         var request = new UpdateOrganizationSettingsRequest
         {
-            MaxUsers = 50,
-            MaxTranscriptionHours = 100,
+            MaxTranscriptionMinutes = 6000,
             CanExportTranscriptions = true,
             HasRealtimeTranscription = true
         };
@@ -268,16 +267,14 @@ public class OrganizationsControllerTests : BaseIntegrationTest
 
         var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
-        result!.MaxUsers.Should().Be(request.MaxUsers);
-        result.MaxTranscriptionHours.Should().Be(request.MaxTranscriptionHours);
+        result!.MaxTranscriptionMinutes.Should().Be(request.MaxTranscriptionMinutes);
         result.CanExportTranscriptions.Should().Be(request.CanExportTranscriptions!.Value);
         result.HasRealtimeTranscription.Should().Be(request.HasRealtimeTranscription!.Value);
 
         // Verify the update was persisted to database
         var updatedOrg = await DbContext.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organization.Id);
         updatedOrg.Should().NotBeNull();
-        updatedOrg!.MaxUsers.Should().Be(request.MaxUsers);
-        updatedOrg.MaxTranscriptionHours.Should().Be(request.MaxTranscriptionHours);
+        updatedOrg!.MaxTranscriptionMinutes.Should().Be(request.MaxTranscriptionMinutes);
         updatedOrg.CanExportTranscriptions.Should().Be(request.CanExportTranscriptions!.Value);
         updatedOrg.HasRealtimeTranscription.Should().Be(request.HasRealtimeTranscription!.Value);
     }
