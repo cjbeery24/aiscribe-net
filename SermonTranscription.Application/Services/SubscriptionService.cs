@@ -46,7 +46,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving current subscription for organization {OrganizationId}", organizationId);
-            return ServiceResult<SubscriptionResponse?>.Failure("An error occurred while retrieving the current subscription", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse?>.Failure("An error occurred while retrieving the current subscription", ErrorCode.InternalError);
         }
     }
 
@@ -64,7 +64,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving subscriptions for organization {OrganizationId}", organizationId);
-            return ServiceResult<IEnumerable<SubscriptionResponse>>.Failure("An error occurred while retrieving organization subscriptions", "INTERNAL_ERROR");
+            return ServiceResult<IEnumerable<SubscriptionResponse>>.Failure("An error occurred while retrieving organization subscriptions", ErrorCode.InternalError);
         }
     }
 
@@ -79,14 +79,14 @@ public class SubscriptionService : ISubscriptionService
             var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Organization with ID {organizationId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Organization with ID {organizationId} not found", ErrorCode.NotFound);
             }
 
             // Check if organization already has an active subscription
             var existingSubscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
             if (existingSubscription != null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Organization already has an active subscription", "CONFLICT");
+                return ServiceResult<SubscriptionResponse>.Failure("Organization already has an active subscription", ErrorCode.Conflict);
             }
 
             // Create new subscription
@@ -117,7 +117,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating subscription for organization {OrganizationId} with plan {Plan}", organizationId, plan);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while creating the subscription", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while creating the subscription", ErrorCode.InternalError);
         }
     }
 
@@ -131,12 +131,12 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
             if (!subscription.IsActive)
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Cannot change plan for inactive subscription", "FORBIDDEN");
+                return ServiceResult<SubscriptionResponse>.Failure("Cannot change plan for inactive subscription", ErrorCode.Forbidden);
             }
 
             var oldPlan = subscription.Plan;
@@ -169,7 +169,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error changing subscription plan for subscription {SubscriptionId} to {NewPlan}", subscriptionId, newPlan);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while changing the subscription plan", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while changing the subscription plan", ErrorCode.InternalError);
         }
     }
 
@@ -183,12 +183,12 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
             if (!subscription.IsCancelled)
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already cancelled", "CONFLICT");
+                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already cancelled", ErrorCode.Conflict);
             }
 
             subscription.Cancel();
@@ -203,7 +203,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error cancelling subscription {SubscriptionId}", subscriptionId);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while cancelling the subscription", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while cancelling the subscription", ErrorCode.InternalError);
         }
     }
 
@@ -217,12 +217,12 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
             if (subscription.IsActive)
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already active", "CONFLICT");
+                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already active", ErrorCode.Conflict);
             }
 
             subscription.Reactivate();
@@ -237,7 +237,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reactivating subscription {SubscriptionId}", subscriptionId);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while reactivating the subscription", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while reactivating the subscription", ErrorCode.InternalError);
         }
     }
 
@@ -251,17 +251,17 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
             if (!subscription.IsActive)
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Cannot track usage for inactive subscription", "FORBIDDEN");
+                return ServiceResult<SubscriptionResponse>.Failure("Cannot track usage for inactive subscription", ErrorCode.Forbidden);
             }
 
             if (!subscription.CanUseTranscriptionMinutes(minutesUsed))
             {
-                return ServiceResult<SubscriptionResponse>.Failure("Insufficient transcription minutes remaining.", "VALIDATION_ERROR", "minutesUsed");
+                return ServiceResult<SubscriptionResponse>.Failure("Insufficient transcription minutes remaining.", ErrorCode.ValidationError, "minutesUsed");
             }
 
             subscription.UseTranscriptionMinutes(minutesUsed);
@@ -276,7 +276,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error tracking usage for subscription {SubscriptionId}", subscriptionId);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while tracking usage", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while tracking usage", ErrorCode.InternalError);
         }
     }
 
@@ -290,7 +290,7 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
             subscription.ResetUsage();
@@ -305,7 +305,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resetting monthly usage for subscription {SubscriptionId}", subscriptionId);
-            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while resetting monthly usage", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while resetting monthly usage", ErrorCode.InternalError);
         }
     }
 
@@ -319,7 +319,7 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<bool>.Failure("No active subscription found for organization", "NOT_FOUND");
+                return ServiceResult<bool>.Failure("No active subscription found for organization", ErrorCode.NotFound);
             }
 
             var canUse = subscription.CanUseTranscriptionMinutes(minutes);
@@ -328,7 +328,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking transcription minutes usage for organization {OrganizationId}", organizationId);
-            return ServiceResult<bool>.Failure("An error occurred while checking usage", "INTERNAL_ERROR");
+            return ServiceResult<bool>.Failure("An error occurred while checking usage", ErrorCode.InternalError);
         }
     }
 
@@ -342,7 +342,7 @@ public class SubscriptionService : ISubscriptionService
             var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
             if (subscription == null)
             {
-                return ServiceResult<SubscriptionUsageResponse>.Failure("No active subscription found for organization", "NOT_FOUND");
+                return ServiceResult<SubscriptionUsageResponse>.Failure("No active subscription found for organization", ErrorCode.NotFound);
             }
 
             var response = new SubscriptionUsageResponse
@@ -366,7 +366,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving usage analytics for organization {OrganizationId}", organizationId);
-            return ServiceResult<SubscriptionUsageResponse>.Failure("An error occurred while retrieving usage analytics", "INTERNAL_ERROR");
+            return ServiceResult<SubscriptionUsageResponse>.Failure("An error occurred while retrieving usage analytics", ErrorCode.InternalError);
         }
     }
 
@@ -397,7 +397,7 @@ public class SubscriptionService : ISubscriptionService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving available subscription plans");
-            return Task.FromResult(ServiceResult<IEnumerable<SubscriptionPlanResponse>>.Failure("An error occurred while retrieving available plans", "INTERNAL_ERROR"));
+            return Task.FromResult(ServiceResult<IEnumerable<SubscriptionPlanResponse>>.Failure("An error occurred while retrieving available plans", ErrorCode.InternalError));
         }
     }
 

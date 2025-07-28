@@ -45,7 +45,7 @@ public class UserService : IUserService
             var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
-                return ServiceResult<UserProfileResponse>.Failure("User not found", "NOT_FOUND");
+                return ServiceResult<UserProfileResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
             var response = _mapper.Map<UserProfileResponse>(user);
@@ -54,7 +54,7 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving user profile for user {UserId}", userId);
-            return ServiceResult<UserProfileResponse>.Failure("An error occurred while retrieving the user profile", "INTERNAL_ERROR");
+            return ServiceResult<UserProfileResponse>.Failure("An error occurred while retrieving the user profile", ErrorCode.InternalError);
         }
     }
 
@@ -65,7 +65,7 @@ public class UserService : IUserService
             var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
-                return ServiceResult<UserProfileResponse>.Failure("User not found", "NOT_FOUND");
+                return ServiceResult<UserProfileResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
             // Update user properties (only the ones that exist in the User entity)
@@ -84,7 +84,7 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating user profile for user {UserId}", userId);
-            return ServiceResult<UserProfileResponse>.Failure("An error occurred while updating the user profile", "INTERNAL_ERROR");
+            return ServiceResult<UserProfileResponse>.Failure("An error occurred while updating the user profile", ErrorCode.InternalError);
         }
     }
 
@@ -95,13 +95,13 @@ public class UserService : IUserService
             var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
-                return ServiceResult.Failure("User not found", "NOT_FOUND");
+                return ServiceResult.Failure("User not found", ErrorCode.NotFound);
             }
 
             // Verify current password
             if (!_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
             {
-                return ServiceResult.Failure("Current password is incorrect", "UNAUTHORIZED");
+                return ServiceResult.Failure("Current password is incorrect", ErrorCode.Unauthorized);
             }
 
             // Validate new password
@@ -111,7 +111,7 @@ public class UserService : IUserService
             }
             catch (PasswordValidationDomainException ex)
             {
-                return ServiceResult.Failure(ex.Message, "VALIDATION_ERROR", "newPassword");
+                return ServiceResult.Failure(ex.Message, ErrorCode.ValidationError, "newPassword");
             }
 
             // Hash new password
@@ -126,7 +126,7 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error changing password for user {UserId}", userId);
-            return ServiceResult.Failure("An error occurred while changing the password", "INTERNAL_ERROR");
+            return ServiceResult.Failure("An error occurred while changing the password", ErrorCode.InternalError);
         }
     }
 

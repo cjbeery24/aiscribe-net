@@ -53,12 +53,12 @@ public class InvitationService
             // Validate the request
             if (string.IsNullOrWhiteSpace(request.Email))
             {
-                return ServiceResult<InviteUserResponse>.Failure("Email address is required", "VALIDATION_ERROR", "email");
+                return ServiceResult<InviteUserResponse>.Failure("Email address is required", ErrorCode.ValidationError, "email");
             }
 
             if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
             {
-                return ServiceResult<InviteUserResponse>.Failure("First name and last name are required", "VALIDATION_ERROR", "firstName");
+                return ServiceResult<InviteUserResponse>.Failure("First name and last name are required", ErrorCode.ValidationError, "firstName");
             }
 
             // Check if user already exists
@@ -72,7 +72,7 @@ public class InvitationService
 
                 if (existingMembership != null)
                 {
-                    return ServiceResult<InviteUserResponse>.Failure("User is already a member of this organization", "CONFLICT");
+                    return ServiceResult<InviteUserResponse>.Failure("User is already a member of this organization", ErrorCode.Conflict);
                 }
             }
 
@@ -80,7 +80,7 @@ public class InvitationService
             var invitingUser = await _userRepository.GetByIdAsync(invitedByUserId);
             if (invitingUser == null)
             {
-                return ServiceResult<InviteUserResponse>.Failure("Inviting user not found", "NOT_FOUND");
+                return ServiceResult<InviteUserResponse>.Failure("Inviting user not found", ErrorCode.NotFound);
             }
 
             // Generate invitation token
@@ -144,7 +144,7 @@ public class InvitationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error inviting user {Email} to organization {OrganizationId}", request.Email, organizationId);
-            return ServiceResult<InviteUserResponse>.Failure("An error occurred while sending the invitation", "INTERNAL_ERROR");
+            return ServiceResult<InviteUserResponse>.Failure("An error occurred while sending the invitation", ErrorCode.InternalError);
         }
     }
 
@@ -158,12 +158,12 @@ public class InvitationService
             // Validate the request
             if (string.IsNullOrWhiteSpace(request.InvitationToken))
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation token is required", "VALIDATION_ERROR", "invitationToken");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation token is required", ErrorCode.ValidationError, "invitationToken");
             }
 
             if (string.IsNullOrWhiteSpace(request.Password))
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("Password is required", "VALIDATION_ERROR", "password");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Password is required", ErrorCode.ValidationError, "password");
             }
 
             // Validate password
@@ -173,33 +173,33 @@ public class InvitationService
             }
             catch (PasswordValidationDomainException ex)
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure(ex.Message, "VALIDATION_ERROR", "password");
+                return ServiceResult<AcceptInvitationResponse>.Failure(ex.Message, ErrorCode.ValidationError, "password");
             }
 
             // Find the invitation
             var userOrganization = await _userOrganizationRepository.GetByInvitationTokenAsync(request.InvitationToken);
             if (userOrganization == null)
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("Invalid invitation token", "NOT_FOUND");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invalid invitation token", ErrorCode.NotFound);
             }
 
             // Check if invitation is expired (7 days)
             if (userOrganization.CreatedAt < DateTime.UtcNow.AddDays(-7))
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has expired", "UNAUTHORIZED");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has expired", ErrorCode.Unauthorized);
             }
 
             // Check if invitation is already accepted
             if (userOrganization.InvitationAcceptedAt.HasValue)
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has already been accepted", "CONFLICT");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has already been accepted", ErrorCode.Conflict);
             }
 
             // Get the user
             var user = userOrganization.User ?? await _userRepository.GetByIdAsync(userOrganization.UserId);
             if (user == null)
             {
-                return ServiceResult<AcceptInvitationResponse>.Failure("User not found", "NOT_FOUND");
+                return ServiceResult<AcceptInvitationResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
             // Hash the password
@@ -233,7 +233,7 @@ public class InvitationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error accepting invitation with token {Token}", request.InvitationToken);
-            return ServiceResult<AcceptInvitationResponse>.Failure("An error occurred while accepting the invitation", "INTERNAL_ERROR");
+            return ServiceResult<AcceptInvitationResponse>.Failure("An error occurred while accepting the invitation", ErrorCode.InternalError);
         }
     }
 

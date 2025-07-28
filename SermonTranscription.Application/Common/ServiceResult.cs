@@ -5,19 +5,60 @@ using System.Linq;
 namespace SermonTranscription.Application.Common;
 
 /// <summary>
+/// Predefined error codes for consistent error handling
+/// </summary>
+public enum ErrorCode
+{
+    /// <summary>
+    /// Generic error when no specific error code applies
+    /// </summary>
+    GenericError,
+
+    /// <summary>
+    /// Resource not found
+    /// </summary>
+    NotFound,
+
+    /// <summary>
+    /// User is not authenticated
+    /// </summary>
+    Unauthorized,
+
+    /// <summary>
+    /// User is authenticated but lacks permission
+    /// </summary>
+    Forbidden,
+
+    /// <summary>
+    /// Resource conflict (e.g., duplicate email, name already exists)
+    /// </summary>
+    Conflict,
+
+    /// <summary>
+    /// Validation error (invalid input data)
+    /// </summary>
+    ValidationError,
+
+    /// <summary>
+    /// Internal server error
+    /// </summary>
+    InternalError
+}
+
+/// <summary>
 /// Represents a detailed error in a service result
 /// </summary>
 public class ServiceError
 {
     public string Message { get; set; } = string.Empty;
-    public string ErrorCode { get; set; } = string.Empty;
+    public ErrorCode ErrorCode { get; set; }
     public string? Field { get; set; }
     public string? AttemptedValue { get; set; }
 
-    public ServiceError(string message, string errorCode = "GENERIC_ERROR", string? field = null, string? attemptedValue = null)
+    public ServiceError(string message, ErrorCode errorCode = ErrorCode.GenericError, string? field = null, string? attemptedValue = null)
     {
         Message = message ?? throw new ArgumentNullException(nameof(message));
-        ErrorCode = errorCode ?? throw new ArgumentNullException(nameof(errorCode));
+        ErrorCode = errorCode;
         Field = field;
         AttemptedValue = attemptedValue;
     }
@@ -45,7 +86,7 @@ public class ServiceResult
     public static ServiceResult Failure(string message, IEnumerable<ServiceError>? errors = null)
         => new(false, message, errors);
 
-    public static ServiceResult Failure(string message, string errorCode, string? field = null, string? attemptedValue = null)
+    public static ServiceResult Failure(string message, ErrorCode errorCode, string? field = null, string? attemptedValue = null)
         => new(false, message, new[] { new ServiceError(message, errorCode, field, attemptedValue) });
 }
 
@@ -73,6 +114,6 @@ public class ServiceResult<T>
     public static ServiceResult<T> Failure(string message, IEnumerable<ServiceError>? errors = null)
         => new(false, message, default, errors);
 
-    public static ServiceResult<T> Failure(string message, string errorCode, string? field = null, string? attemptedValue = null)
+    public static ServiceResult<T> Failure(string message, ErrorCode errorCode, string? field = null, string? attemptedValue = null)
         => new(false, message, default, new[] { new ServiceError(message, errorCode, field, attemptedValue) });
 }

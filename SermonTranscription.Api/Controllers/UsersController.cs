@@ -32,7 +32,7 @@ public class UsersController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserProfile()
     {
-        var userId = HttpContext.GetUserId()!.Value;
+        var userId = GetCurrentUserId();
         var result = await _userService.GetUserProfileAsync(userId, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
@@ -50,7 +50,7 @@ public class UsersController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUserProfile([FromBody] UpdateUserProfileRequest request)
     {
-        var userId = HttpContext.GetUserId()!.Value;
+        var userId = GetCurrentUserId();
         var result = await _userService.UpdateUserProfileAsync(userId, request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
@@ -68,7 +68,7 @@ public class UsersController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
-        var userId = HttpContext.GetUserId()!.Value;
+        var userId = GetCurrentUserId();
         var result = await _userService.ChangePasswordAsync(userId, request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => SuccessResponse("Password changed successfully"));
     }

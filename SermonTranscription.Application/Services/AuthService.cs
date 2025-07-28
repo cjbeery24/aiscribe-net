@@ -42,7 +42,7 @@ public class AuthService : IAuthService
             // Validate input
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
-                return ServiceResult<LoginResponse>.Failure("Email and password are required", "VALIDATION_ERROR", "email");
+                return ServiceResult<LoginResponse>.Failure("Email and password are required", ErrorCode.ValidationError, "email");
             }
 
             // Find user by email
@@ -50,28 +50,28 @@ public class AuthService : IAuthService
             if (user == null)
             {
                 _logger.LogWarning("Login attempt with non-existent email: {Email}", email);
-                return ServiceResult<LoginResponse>.Failure("Invalid email or password", "UNAUTHORIZED");
+                return ServiceResult<LoginResponse>.Failure("Invalid email or password", ErrorCode.Unauthorized);
             }
 
             // Validate user is active
             if (!user.IsActive)
             {
                 _logger.LogWarning("Login attempt for inactive user: {UserId}", user.Id);
-                return ServiceResult<LoginResponse>.Failure("Account is deactivated", "FORBIDDEN");
+                return ServiceResult<LoginResponse>.Failure("Account is deactivated", ErrorCode.Forbidden);
             }
 
             // Validate email is verified
             if (!user.IsEmailVerified)
             {
                 _logger.LogWarning("Login attempt for unverified email: {UserId}", user.Id);
-                return ServiceResult<LoginResponse>.Failure("Email address not verified", "UNAUTHORIZED");
+                return ServiceResult<LoginResponse>.Failure("Email address not verified", ErrorCode.Unauthorized);
             }
 
             // Verify password (assuming BCrypt is used)
             if (!_passwordHasher.VerifyPassword(password, user.PasswordHash))
             {
                 _logger.LogWarning("Login attempt with invalid password for user: {UserId}", user.Id);
-                return ServiceResult<LoginResponse>.Failure("Invalid email or password", "UNAUTHORIZED");
+                return ServiceResult<LoginResponse>.Failure("Invalid email or password", ErrorCode.Unauthorized);
             }
 
             // Get user's first organization membership
@@ -80,7 +80,7 @@ public class AuthService : IAuthService
             if (primaryMembership == null)
             {
                 _logger.LogWarning("User {UserId} has no active organization membership", user.Id);
-                return ServiceResult<LoginResponse>.Failure("User is not associated with any organization", "FORBIDDEN");
+                return ServiceResult<LoginResponse>.Failure("User is not associated with any organization", ErrorCode.Forbidden);
             }
 
             // Generate tokens (JWT contains only user identity, no tenant info)
@@ -111,7 +111,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for email: {Email}", email);
-            return ServiceResult<LoginResponse>.Failure("An error occurred during login", "INTERNAL_ERROR");
+            return ServiceResult<LoginResponse>.Failure("An error occurred during login", ErrorCode.InternalError);
         }
     }
 
@@ -122,14 +122,14 @@ public class AuthService : IAuthService
             // Validate input
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             {
-                return ServiceResult<RegisterResponse>.Failure("Email and password are required", "VALIDATION_ERROR", "email");
+                return ServiceResult<RegisterResponse>.Failure("Email and password are required", ErrorCode.ValidationError, "email");
             }
 
             // Check if user already exists
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
             if (existingUser != null)
             {
-                return ServiceResult<RegisterResponse>.Failure("User with this email already exists", "CONFLICT", "email", request.Email);
+                return ServiceResult<RegisterResponse>.Failure("User with this email already exists", ErrorCode.Conflict, "email", request.Email);
             }
 
             // Validate password
@@ -139,7 +139,7 @@ public class AuthService : IAuthService
             }
             catch (PasswordValidationDomainException ex)
             {
-                return ServiceResult<RegisterResponse>.Failure(ex.Message, "VALIDATION_ERROR", "password");
+                return ServiceResult<RegisterResponse>.Failure(ex.Message, ErrorCode.ValidationError, "password");
             }
 
             // Hash password
@@ -173,7 +173,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during registration for email: {Email}", request.Email);
-            return ServiceResult<RegisterResponse>.Failure("An error occurred during registration", "INTERNAL_ERROR");
+            return ServiceResult<RegisterResponse>.Failure("An error occurred during registration", ErrorCode.InternalError);
         }
     }
 
@@ -183,7 +183,7 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                return ServiceResult<RefreshResponse>.Failure("Refresh token is required", "VALIDATION_ERROR", "refreshToken");
+                return ServiceResult<RefreshResponse>.Failure("Refresh token is required", ErrorCode.ValidationError, "refreshToken");
             }
 
             // Find refresh token in database
@@ -191,21 +191,21 @@ public class AuthService : IAuthService
             if (tokenEntity == null)
             {
                 _logger.LogWarning("Refresh token not found: {Token}", refreshToken);
-                return ServiceResult<RefreshResponse>.Failure("Invalid refresh token", "UNAUTHORIZED");
+                return ServiceResult<RefreshResponse>.Failure("Invalid refresh token", ErrorCode.Unauthorized);
             }
 
             // Check if token is expired
             if (tokenEntity.ExpiresAt < DateTime.UtcNow)
             {
                 await _userRepository.RevokeRefreshTokenAsync(refreshToken);
-                return ServiceResult<RefreshResponse>.Failure("Refresh token has expired", "UNAUTHORIZED");
+                return ServiceResult<RefreshResponse>.Failure("Refresh token has expired", ErrorCode.Unauthorized);
             }
 
             // Check if token is revoked
             if (tokenEntity.RevokedAt.HasValue)
             {
                 _logger.LogWarning("Refresh token revoked for user: {UserId}", tokenEntity.UserId);
-                return ServiceResult<RefreshResponse>.Failure("Refresh token has been revoked", "UNAUTHORIZED");
+                return ServiceResult<RefreshResponse>.Failure("Refresh token has been revoked", ErrorCode.Unauthorized);
             }
 
             // Get user
@@ -215,7 +215,7 @@ public class AuthService : IAuthService
             {
                 _logger.LogWarning("Refresh token used for inactive user: {UserId}", user.Id);
                 await _userRepository.RevokeAllUserRefreshTokensAsync(user.Id);
-                return ServiceResult<RefreshResponse>.Failure("User account is deactivated", "FORBIDDEN");
+                return ServiceResult<RefreshResponse>.Failure("User account is deactivated", ErrorCode.Forbidden);
             }
 
             // Generate new tokens
@@ -239,7 +239,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during token refresh");
-            return ServiceResult<RefreshResponse>.Failure("An error occurred during token refresh", "INTERNAL_ERROR");
+            return ServiceResult<RefreshResponse>.Failure("An error occurred during token refresh", ErrorCode.InternalError);
         }
     }
 
@@ -249,7 +249,7 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                return ServiceResult<LogoutResponse>.Failure("Refresh token is required", "VALIDATION_ERROR", "refreshToken");
+                return ServiceResult<LogoutResponse>.Failure("Refresh token is required", ErrorCode.ValidationError, "refreshToken");
             }
 
             await _userRepository.RevokeRefreshTokenAsync(refreshToken);
@@ -266,7 +266,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during logout");
-            return ServiceResult<LogoutResponse>.Failure("An error occurred during logout", "INTERNAL_ERROR");
+            return ServiceResult<LogoutResponse>.Failure("An error occurred during logout", ErrorCode.InternalError);
         }
     }
 
@@ -277,7 +277,7 @@ public class AuthService : IAuthService
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
             {
-                return ServiceResult<LogoutResponse>.Failure("User not found", "NOT_FOUND");
+                return ServiceResult<LogoutResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
             await _userRepository.RevokeAllUserRefreshTokensAsync(userId);
@@ -294,7 +294,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error revoking all refresh tokens for user {UserId}", userId);
-            return ServiceResult<LogoutResponse>.Failure("An error occurred while revoking refresh tokens", "INTERNAL_ERROR");
+            return ServiceResult<LogoutResponse>.Failure("An error occurred while revoking refresh tokens", ErrorCode.InternalError);
         }
     }
 
@@ -319,7 +319,7 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrWhiteSpace(email))
             {
-                return ServiceResult<ForgotPasswordResponse>.Failure("Email is required", "VALIDATION_ERROR", "email");
+                return ServiceResult<ForgotPasswordResponse>.Failure("Email is required", ErrorCode.ValidationError, "email");
             }
 
             var user = await _userRepository.GetByEmailAsync(email);
@@ -362,7 +362,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during forgot password for email: {Email}", email);
-            return ServiceResult<ForgotPasswordResponse>.Failure("An error occurred while processing the request", "INTERNAL_ERROR");
+            return ServiceResult<ForgotPasswordResponse>.Failure("An error occurred while processing the request", ErrorCode.InternalError);
         }
     }
 
@@ -372,7 +372,7 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword))
             {
-                return ServiceResult<ResetPasswordResponse>.Failure("Token and new password are required", "VALIDATION_ERROR");
+                return ServiceResult<ResetPasswordResponse>.Failure("Token and new password are required", ErrorCode.ValidationError);
             }
 
             // Validate new password
@@ -382,20 +382,20 @@ public class AuthService : IAuthService
             }
             catch (PasswordValidationDomainException ex)
             {
-                return ServiceResult<ResetPasswordResponse>.Failure(ex.Message, "VALIDATION_ERROR", "newPassword");
+                return ServiceResult<ResetPasswordResponse>.Failure(ex.Message, ErrorCode.ValidationError, "newPassword");
             }
             // Find user by reset token
             var user = await _userRepository.GetByPasswordResetTokenAsync(token);
             if (user == null)
             {
-                return ServiceResult<ResetPasswordResponse>.Failure("Invalid or expired reset token", "UNAUTHORIZED");
+                return ServiceResult<ResetPasswordResponse>.Failure("Invalid or expired reset token", ErrorCode.Unauthorized);
             }
 
             // Check if token is expired
             if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
             {
                 _logger.LogWarning("Password reset attempted with expired token for user: {UserId}", user.Id);
-                return ServiceResult<ResetPasswordResponse>.Failure("Reset token has expired", "UNAUTHORIZED");
+                return ServiceResult<ResetPasswordResponse>.Failure("Reset token has expired", ErrorCode.Unauthorized);
             }
 
             // Hash new password
@@ -421,7 +421,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during password reset");
-            return ServiceResult<ResetPasswordResponse>.Failure("An error occurred while resetting the password", "INTERNAL_ERROR");
+            return ServiceResult<ResetPasswordResponse>.Failure("An error occurred while resetting the password", ErrorCode.InternalError);
         }
     }
 
@@ -437,7 +437,7 @@ public class AuthService : IAuthService
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
             {
-                return ServiceResult<List<OrganizationSummaryDto>>.Failure("User not found", "NOT_FOUND");
+                return ServiceResult<List<OrganizationSummaryDto>>.Failure("User not found", ErrorCode.NotFound);
             }
 
             var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId);
@@ -458,7 +458,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving organizations for user {UserId}", userId);
-            return ServiceResult<List<OrganizationSummaryDto>>.Failure("An error occurred while retrieving user organizations", "INTERNAL_ERROR");
+            return ServiceResult<List<OrganizationSummaryDto>>.Failure("An error occurred while retrieving user organizations", ErrorCode.InternalError);
         }
     }
 }

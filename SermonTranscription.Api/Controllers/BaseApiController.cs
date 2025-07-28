@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Application.Common;
 using SermonTranscription.Application.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FluentValidation.Results;
 
 namespace SermonTranscription.Api.Controllers;
@@ -41,7 +38,7 @@ public abstract class BaseApiController : ControllerBase
                 {
                     Field = e.Field!,
                     Message = e.Message,
-                    ErrorCode = e.ErrorCode,
+                    ErrorCode = e.ErrorCode.ToString(),
                     AttemptedValue = e.AttemptedValue
                 })
                 .ToArray();
@@ -61,24 +58,23 @@ public abstract class BaseApiController : ControllerBase
             var errorResponse = ApiResponse<T>.ErrorResponse(result.Message, result.Errors.Select(e => e.Message).ToArray());
 
             // Map based on error codes or message content
-            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode?.ToUpperInvariant();
+            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
             switch (errorCode)
             {
-                case "NOT_FOUND":
+                case ErrorCode.NotFound:
                 case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
                     return NotFound(errorResponse);
 
-                case "UNAUTHORIZED":
-                case "ACCESS_DENIED":
+                case ErrorCode.Unauthorized:
                 case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
                                result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
                     return Unauthorized(errorResponse);
 
-                case "FORBIDDEN":
+                case ErrorCode.Forbidden:
                 case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
                     return StatusCode(403, errorResponse);
 
-                case "CONFLICT":
+                case ErrorCode.Conflict:
                 case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
                     return Conflict(errorResponse);
 
@@ -107,7 +103,7 @@ public abstract class BaseApiController : ControllerBase
                 {
                     Field = e.Field!,
                     Message = e.Message,
-                    ErrorCode = e.ErrorCode,
+                    ErrorCode = e.ErrorCode.ToString(),
                     AttemptedValue = e.AttemptedValue
                 })
                 .ToArray();
@@ -126,24 +122,23 @@ public abstract class BaseApiController : ControllerBase
 
             var errorResponse = ApiResponse.ErrorResponse(result.Message, result.Errors.Select(e => e.Message).ToArray());
 
-            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode?.ToUpperInvariant();
+            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
             switch (errorCode)
             {
-                case "NOT_FOUND":
+                case ErrorCode.NotFound:
                 case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
                     return NotFound(errorResponse);
 
-                case "UNAUTHORIZED":
-                case "ACCESS_DENIED":
+                case ErrorCode.Unauthorized:
                 case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
                                result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
                     return Unauthorized(errorResponse);
 
-                case "FORBIDDEN":
+                case ErrorCode.Forbidden:
                 case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
                     return StatusCode(403, errorResponse);
 
-                case "CONFLICT":
+                case ErrorCode.Conflict:
                 case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
                     return Conflict(errorResponse);
 
@@ -214,66 +209,6 @@ public abstract class BaseApiController : ControllerBase
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Creates a standardized error response for bad request using ApiResponse wrapper
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="errors">Additional error details</param>
-    /// <returns>Bad request response</returns>
-    protected IActionResult BadRequestError(string message, string[]? errors = null)
-    {
-        var errorResponse = ApiResponse<object>.ErrorResponse(message, errors);
-        return BadRequest(errorResponse);
-    }
-
-    /// <summary>
-    /// Creates a standardized error response for not found using ApiResponse wrapper
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="errors">Additional error details</param>
-    /// <returns>Not found response</returns>
-    protected IActionResult NotFoundError(string message, string[]? errors = null)
-    {
-        var errorResponse = ApiResponse<object>.ErrorResponse(message, errors);
-        return NotFound(errorResponse);
-    }
-
-    /// <summary>
-    /// Creates a standardized error response for unauthorized using ApiResponse wrapper
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="errors">Additional error details</param>
-    /// <returns>Unauthorized response</returns>
-    protected IActionResult UnauthorizedError(string message, string[]? errors = null)
-    {
-        var errorResponse = ApiResponse<object>.ErrorResponse(message, errors);
-        return Unauthorized(errorResponse);
-    }
-
-    /// <summary>
-    /// Creates a standardized error response for forbidden using ApiResponse wrapper
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="errors">Additional error details</param>
-    /// <returns>Forbidden response</returns>
-    protected IActionResult ForbiddenError(string message, string[]? errors = null)
-    {
-        var errorResponse = ApiResponse<object>.ErrorResponse(message, errors);
-        return StatusCode(403, errorResponse);
-    }
-
-    /// <summary>
-    /// Creates a standardized error response for conflict using ApiResponse wrapper
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="errors">Additional error details</param>
-    /// <returns>Conflict response</returns>
-    protected IActionResult ConflictError(string message, string[]? errors = null)
-    {
-        var errorResponse = ApiResponse<object>.ErrorResponse(message, errors);
-        return Conflict(errorResponse);
     }
 
     /// <summary>

@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
+
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application.DTOs;
-using SermonTranscription.Application.Services;
 using SermonTranscription.Application.Interfaces;
-using SermonTranscription.Domain.Enums;
 
 namespace SermonTranscription.Api.Controllers;
 

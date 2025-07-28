@@ -34,12 +34,8 @@ public class OrganizationsController : BaseAuthenticatedApiController
     public async Task<IActionResult> CreateOrganization([FromBody] CreateOrganizationRequest request)
     {
         var userId = GetCurrentUserId();
-        if (!userId.HasValue)
-        {
-            return UnauthorizedError("User not authenticated");
-        }
 
-        var result = await _organizationService.CreateOrganizationAsync(request, userId.Value, HttpContext.RequestAborted);
+        var result = await _organizationService.CreateOrganizationAsync(request, userId, HttpContext.RequestAborted);
         return HandleServiceResult(result, () =>
             StatusCode(201, SuccessResponse(result.Data!, "Organization created successfully")));
     }
