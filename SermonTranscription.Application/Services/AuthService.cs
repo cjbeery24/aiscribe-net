@@ -1,10 +1,9 @@
 using Microsoft.Extensions.Logging;
 using SermonTranscription.Domain.Entities;
-using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Domain.Exceptions;
-using BCrypt.Net;
 using SermonTranscription.Application.DTOs;
+using SermonTranscription.Application.Common;
 
 namespace SermonTranscription.Application.Services;
 
@@ -36,14 +35,14 @@ public class AuthService : IAuthService
         _passwordValidator = passwordValidator;
     }
 
-    public async Task<AuthResult> LoginAsync(string email, string password)
+    public async Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password)
     {
         try
         {
             // Validate input
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
-                return AuthResult.Failure("Email and password are required");
+                return ServiceResult<LoginResponse>.Failure("Email and password are required", "VALIDATION_ERROR", "email");
             }
 
             // Find user by email
@@ -51,28 +50,28 @@ public class AuthService : IAuthService
             if (user == null)
             {
                 _logger.LogWarning("Login attempt with non-existent email: {Email}", email);
-                return AuthResult.Failure("Invalid email or password");
+                return ServiceResult<LoginResponse>.Failure("Invalid email or password", "UNAUTHORIZED");
             }
 
             // Validate user is active
             if (!user.IsActive)
             {
                 _logger.LogWarning("Login attempt for inactive user: {UserId}", user.Id);
-                return AuthResult.Failure("Account is deactivated");
+                return ServiceResult<LoginResponse>.Failure("Account is deactivated", "FORBIDDEN");
             }
 
             // Validate email is verified
             if (!user.IsEmailVerified)
             {
                 _logger.LogWarning("Login attempt for unverified email: {UserId}", user.Id);
-                return AuthResult.Failure("Email address not verified");
+                return ServiceResult<LoginResponse>.Failure("Email address not verified", "UNAUTHORIZED");
             }
 
             // Verify password (assuming BCrypt is used)
             if (!_passwordHasher.VerifyPassword(password, user.PasswordHash))
             {
                 _logger.LogWarning("Login attempt with invalid password for user: {UserId}", user.Id);
-                return AuthResult.Failure("Invalid email or password");
+                return ServiceResult<LoginResponse>.Failure("Invalid email or password", "UNAUTHORIZED");
             }
 
             // Get user's first organization membership
@@ -81,7 +80,7 @@ public class AuthService : IAuthService
             if (primaryMembership == null)
             {
                 _logger.LogWarning("User {UserId} has no active organization membership", user.Id);
-                return AuthResult.Failure("User is not associated with any organization");
+                return ServiceResult<LoginResponse>.Failure("User is not associated with any organization", "FORBIDDEN");
             }
 
             // Generate tokens (JWT contains only user identity, no tenant info)
@@ -94,417 +93,384 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Successful login for user {UserId}", user.Id);
 
-            return AuthResult.Success(accessToken, refreshToken, new AuthUserInfo
+            var response = new LoginResponse
             {
-                UserId = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName
-                // OrganizationId and Role are no longer included as they're determined per-request
-            });
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                User = new AuthUserInfo
+                {
+                    UserId = user.Id,
+                    Email = user.Email,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName
+                }
+            };
+
+            return ServiceResult<LoginResponse>.Success(response, "Login successful");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for email: {Email}", email);
-            return AuthResult.Failure("An error occurred during login");
+            return ServiceResult<LoginResponse>.Failure("An error occurred during login", "INTERNAL_ERROR");
         }
     }
 
-    public async Task<AuthResult> RegisterAsync(RegisterRequest request)
+    public async Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request)
     {
         try
         {
             // Validate input
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             {
-                return AuthResult.Failure("Email and password are required");
+                return ServiceResult<RegisterResponse>.Failure("Email and password are required", "VALIDATION_ERROR", "email");
             }
-
-            if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
-            {
-                return AuthResult.Failure("First name and last name are required");
-            }
-
-            _passwordValidator.Validate(request.Password);
 
             // Check if user already exists
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
             if (existingUser != null)
             {
-                return AuthResult.Failure("User with this email already exists");
+                return ServiceResult<RegisterResponse>.Failure("User with this email already exists", "CONFLICT", "email", request.Email);
             }
+
+            // Validate password
+            try
+            {
+                _passwordValidator.Validate(request.Password);
+            }
+            catch (PasswordValidationDomainException ex)
+            {
+                return ServiceResult<RegisterResponse>.Failure(ex.Message, "VALIDATION_ERROR", "password");
+            }
+
+            // Hash password
+            var passwordHash = _passwordHasher.HashPassword(request.Password);
 
             // Create new user
             var user = new User
             {
                 Id = Guid.NewGuid(),
-                Email = request.Email.ToLowerInvariant(),
+                Email = request.Email,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                PasswordHash = _passwordHasher.HashPassword(request.Password),
-                IsEmailVerified = false, // Will be verified via email
+                PasswordHash = passwordHash,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                IsEmailVerified = false, // Will be verified via email
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             await _userRepository.AddAsync(user);
 
-            _logger.LogInformation("New user registered: {UserId}", user.Id);
+            _logger.LogInformation("User registered successfully: {UserId}", user.Id);
 
-            return AuthResult.Success("User registered successfully. Please check your email to verify your account.");
-        }
-        catch (PasswordValidationDomainException ex)
-        {
-            _logger.LogWarning("Password validation failed during registration for email: {Email}", request.Email);
-            return AuthResult.Failure(ex.Message);
+            var response = new RegisterResponse
+            {
+                Message = "Registration successful. Please check your email to verify your account."
+            };
+
+            return ServiceResult<RegisterResponse>.Success(response, "Registration successful");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during registration for email: {Email}", request.Email);
-            return AuthResult.Failure("An error occurred during registration");
+            return ServiceResult<RegisterResponse>.Failure("An error occurred during registration", "INTERNAL_ERROR");
         }
     }
 
-    public async Task<AuthResult> RefreshTokenAsync(string refreshToken)
+    public async Task<ServiceResult<RefreshResponse>> RefreshTokenAsync(string refreshToken)
     {
         try
         {
-            // Validate input
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                return AuthResult.Failure("Refresh token is required");
+                return ServiceResult<RefreshResponse>.Failure("Refresh token is required", "VALIDATION_ERROR", "refreshToken");
             }
 
-            // Get refresh token from database
-            var storedRefreshToken = await _userRepository.GetRefreshTokenAsync(refreshToken);
-            if (storedRefreshToken == null)
+            // Find refresh token in database
+            var tokenEntity = await _userRepository.GetRefreshTokenAsync(refreshToken);
+            if (tokenEntity == null)
             {
                 _logger.LogWarning("Refresh token not found: {Token}", refreshToken);
-                return AuthResult.Failure("Invalid refresh token");
+                return ServiceResult<RefreshResponse>.Failure("Invalid refresh token", "UNAUTHORIZED");
             }
 
             // Check if token is expired
-            if (storedRefreshToken.ExpiresAt < DateTime.UtcNow)
+            if (tokenEntity.ExpiresAt < DateTime.UtcNow)
             {
-                _logger.LogWarning("Refresh token expired for user: {UserId}", storedRefreshToken.UserId);
                 await _userRepository.RevokeRefreshTokenAsync(refreshToken);
-                return AuthResult.Failure("Refresh token has expired");
+                return ServiceResult<RefreshResponse>.Failure("Refresh token has expired", "UNAUTHORIZED");
             }
 
             // Check if token is revoked
-            if (storedRefreshToken.RevokedAt.HasValue)
+            if (tokenEntity.RevokedAt.HasValue)
             {
-                _logger.LogWarning("Refresh token revoked for user: {UserId}", storedRefreshToken.UserId);
-                return AuthResult.Failure("Refresh token has been revoked");
+                _logger.LogWarning("Refresh token revoked for user: {UserId}", tokenEntity.UserId);
+                return ServiceResult<RefreshResponse>.Failure("Refresh token has been revoked", "UNAUTHORIZED");
             }
 
-            // Get user and validate they are still active
-            var user = storedRefreshToken.User;
+            // Get user
+            var user = tokenEntity.User;
+
             if (!user.IsActive)
             {
                 _logger.LogWarning("Refresh token used for inactive user: {UserId}", user.Id);
                 await _userRepository.RevokeAllUserRefreshTokensAsync(user.Id);
-                return AuthResult.Failure("User account is deactivated");
+                return ServiceResult<RefreshResponse>.Failure("User account is deactivated", "FORBIDDEN");
             }
 
-            // Get user's primary organization membership
-            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(user.Id);
-            var primaryMembership = memberships.FirstOrDefault(m => m.IsActive);
-            if (primaryMembership == null)
-            {
-                _logger.LogWarning("User {UserId} has no active organization membership", user.Id);
-                return AuthResult.Failure("User is not associated with any organization");
-            }
-
-            // Generate new tokens (JWT contains only user identity, no tenant info)
+            // Generate new tokens
             var newAccessToken = _jwtService.GenerateAccessToken(user);
-            var newRefreshToken = _jwtService.GenerateRefreshToken(user);
+            var newRefreshToken = await IssueRefreshTokenAsync(user);
 
-            // Revoke the old refresh token and add the new one
+            // Revoke old refresh token
             await _userRepository.RevokeRefreshTokenAsync(refreshToken);
 
-            var newStoredRefreshToken = new RefreshToken
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                Token = newRefreshToken,
-                ExpiresAt = DateTime.UtcNow.AddDays(30), // 30 days expiry
-                CreatedAt = DateTime.UtcNow
-            };
-            await _userRepository.AddRefreshTokenAsync(newStoredRefreshToken);
+            _logger.LogInformation("Token refreshed successfully for user {UserId}", user.Id);
 
-            // Update user's last login
-            user.UpdateLastLogin();
-            await _userRepository.UpdateAsync(user);
+            var response = new RefreshResponse
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken
+            };
 
             _logger.LogInformation("Successfully refreshed tokens for user {UserId}", user.Id);
-
-            return AuthResult.Success(newAccessToken, newRefreshToken, new AuthUserInfo
-            {
-                UserId = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName
-                // OrganizationId and Role are no longer included as they're determined per-request
-            });
+            return ServiceResult<RefreshResponse>.Success(response, "Token refreshed successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during token refresh");
-            return AuthResult.Failure("An error occurred during token refresh");
+            return ServiceResult<RefreshResponse>.Failure("An error occurred during token refresh", "INTERNAL_ERROR");
         }
     }
 
-    public async Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken)
+    public async Task<ServiceResult<LogoutResponse>> RevokeRefreshTokenAsync(string refreshToken)
     {
         try
         {
-            // Validate input
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                return AuthResult.Failure("Refresh token is required");
+                return ServiceResult<LogoutResponse>.Failure("Refresh token is required", "VALIDATION_ERROR", "refreshToken");
             }
 
-            // Revoke the refresh token
             await _userRepository.RevokeRefreshTokenAsync(refreshToken);
 
             _logger.LogInformation("Refresh token revoked: {Token}", refreshToken);
 
-            return AuthResult.Success("Refresh token revoked successfully");
+            var response = new LogoutResponse
+            {
+                Message = "Logout successful"
+            };
+
+            return ServiceResult<LogoutResponse>.Success(response, "Logout successful");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error revoking refresh token");
-            return AuthResult.Failure("An error occurred while revoking the refresh token");
+            _logger.LogError(ex, "Error during logout");
+            return ServiceResult<LogoutResponse>.Failure("An error occurred during logout", "INTERNAL_ERROR");
         }
     }
 
-    public async Task<AuthResult> RevokeAllUserRefreshTokensAsync(Guid userId)
+    public async Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId)
     {
         try
         {
-            // Revoke all refresh tokens for the user
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                return ServiceResult<LogoutResponse>.Failure("User not found", "NOT_FOUND");
+            }
+
             await _userRepository.RevokeAllUserRefreshTokensAsync(userId);
 
-            _logger.LogInformation("All refresh tokens revoked for user: {UserId}", userId);
+            _logger.LogInformation("All refresh tokens revoked for user {UserId}", userId);
 
-            return AuthResult.Success("All refresh tokens revoked successfully");
+            var response = new LogoutResponse
+            {
+                Message = "All refresh tokens revoked successfully"
+            };
+
+            return ServiceResult<LogoutResponse>.Success(response, "All refresh tokens revoked successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error revoking all refresh tokens for user {UserId}", userId);
-            return AuthResult.Failure("An error occurred while revoking refresh tokens");
+            return ServiceResult<LogoutResponse>.Failure("An error occurred while revoking refresh tokens", "INTERNAL_ERROR");
         }
     }
 
     private async Task<string> IssueRefreshTokenAsync(User user)
     {
         var refreshToken = _jwtService.GenerateRefreshToken(user);
-
-        var storedRefreshToken = new RefreshToken
+        var tokenEntity = new RefreshToken
         {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
             Token = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(30), // 30 days expiry
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow
         };
 
-        await _userRepository.AddRefreshTokenAsync(storedRefreshToken);
-
+        await _userRepository.AddRefreshTokenAsync(tokenEntity);
         return refreshToken;
     }
 
-
-
-    public async Task<AuthResult> ForgotPasswordAsync(string email)
+    public async Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email)
     {
         try
         {
-            // Validate input
             if (string.IsNullOrWhiteSpace(email))
             {
-                return AuthResult.Failure("Email is required");
+                return ServiceResult<ForgotPasswordResponse>.Failure("Email is required", "VALIDATION_ERROR", "email");
             }
 
-            // Find user by email
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
             {
                 // Don't reveal if user exists or not for security
-                _logger.LogInformation("Password reset requested for email: {Email} (user not found)", email);
-                return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+                _logger.LogInformation("Password reset requested for non-existent email: {Email}", email);
+
+                return ServiceResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse
+                {
+                    Message = "If an account with this email exists, a password reset link has been sent."
+                }, "Password reset email sent");
             }
 
-            // Validate user is active
             if (!user.IsActive)
             {
                 _logger.LogWarning("Password reset requested for inactive user: {UserId}", user.Id);
-                return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+                return ServiceResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse
+                {
+                    Message = "If an account with this email exists, a password reset link has been sent."
+                }, "Password reset email sent");
             }
 
-            // Generate password reset token (valid for 1 hour)
+            // Generate reset token
             var resetToken = GeneratePasswordResetToken();
-            var resetTokenExpiry = DateTime.UtcNow.AddHours(1);
-
-            // Store reset token in user entity (in a real implementation, you might want a separate table)
             user.PasswordResetToken = resetToken;
-            user.PasswordResetTokenExpiry = resetTokenExpiry;
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            user.UpdatedAt = DateTime.UtcNow;
+
             await _userRepository.UpdateAsync(user);
 
             // TODO: Send email with reset link
-            // In a real implementation, you would inject an email service and send the reset link
             _logger.LogInformation("Password reset token generated for user {UserId}: {Token}", user.Id, resetToken);
 
-            return AuthResult.Success("If the email address exists in our system, you will receive a password reset link.");
+            return ServiceResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse
+            {
+                Message = "If an account with this email exists, a password reset link has been sent."
+            }, "Password reset email sent");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during forgot password for email: {Email}", email);
-            return AuthResult.Failure("An error occurred while processing your request");
+            return ServiceResult<ForgotPasswordResponse>.Failure("An error occurred while processing the request", "INTERNAL_ERROR");
         }
     }
 
-    public async Task<AuthResult> ResetPasswordAsync(string token, string newPassword)
+    public async Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword)
     {
         try
         {
-            // Validate input
             if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword))
             {
-                return AuthResult.Failure("Token and new password are required");
+                return ServiceResult<ResetPasswordResponse>.Failure("Token and new password are required", "VALIDATION_ERROR");
             }
 
-            _passwordValidator.Validate(newPassword);
-
+            // Validate new password
+            try
+            {
+                _passwordValidator.Validate(newPassword);
+            }
+            catch (PasswordValidationDomainException ex)
+            {
+                return ServiceResult<ResetPasswordResponse>.Failure(ex.Message, "VALIDATION_ERROR", "newPassword");
+            }
             // Find user by reset token
             var user = await _userRepository.GetByPasswordResetTokenAsync(token);
             if (user == null)
             {
-                _logger.LogWarning("Password reset attempted with invalid token: {Token}", token);
-                return AuthResult.Failure("Invalid or expired reset token");
+                return ServiceResult<ResetPasswordResponse>.Failure("Invalid or expired reset token", "UNAUTHORIZED");
             }
 
             // Check if token is expired
             if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
             {
                 _logger.LogWarning("Password reset attempted with expired token for user: {UserId}", user.Id);
-                return AuthResult.Failure("Reset token has expired");
+                return ServiceResult<ResetPasswordResponse>.Failure("Reset token has expired", "UNAUTHORIZED");
             }
 
-            // Update password and clear reset token
-            user.PasswordHash = _passwordHasher.HashPassword(newPassword);
+            // Hash new password
+            var passwordHash = _passwordHasher.HashPassword(newPassword);
+
+            // Update user
+            user.PasswordHash = passwordHash;
             user.PasswordResetToken = null;
             user.PasswordResetTokenExpiry = null;
             user.UpdatedAt = DateTime.UtcNow;
+
             await _userRepository.UpdateAsync(user);
 
-            _logger.LogInformation("Password successfully reset for user {UserId}", user.Id);
+            _logger.LogInformation("Password reset successfully for user {UserId}", user.Id);
 
-            return AuthResult.Success("Password has been successfully reset");
-        }
-        catch (PasswordValidationDomainException ex)
-        {
-            _logger.LogWarning("Password validation failed during password reset");
-            return AuthResult.Failure(ex.Message);
+            var response = new ResetPasswordResponse
+            {
+                Message = "Password has been reset successfully"
+            };
+
+            return ServiceResult<ResetPasswordResponse>.Success(response, "Password reset successful");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during password reset");
-            return AuthResult.Failure("An error occurred while resetting your password");
+            return ServiceResult<ResetPasswordResponse>.Failure("An error occurred while resetting the password", "INTERNAL_ERROR");
         }
     }
 
     private static string GeneratePasswordResetToken()
     {
-        // Generate a secure random token
-        var randomBytes = new byte[32];
-        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Replace("=", "");
+        return Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).Replace("+", "-").Replace("/", "_").Replace("=", "");
     }
 
-    public async Task<List<OrganizationSummaryDto>> GetUserOrganizationsAsync(Guid userId)
+    public async Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId)
     {
         try
         {
-            // Get user with organization memberships
-            var user = await _userRepository.GetByIdWithOrganizationsAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
             {
-                _logger.LogWarning("User not found: {UserId}", userId);
-                return new List<OrganizationSummaryDto>();
+                return ServiceResult<List<OrganizationSummaryDto>>.Failure("User not found", "NOT_FOUND");
             }
 
-            // Get active organization memberships
             var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId);
-            var activeMemberships = memberships.Where(m => m.IsActive).ToList();
+            var organizations = memberships
+                .Where(m => m.IsActive && m.Organization.IsActive)
+                .Select(m => new OrganizationSummaryDto
+                {
+                    Id = m.Organization.Id,
+                    Name = m.Organization.Name,
+                    Slug = m.Organization.Slug,
+                    Role = m.Role.ToString(),
+                    IsActive = m.IsActive
+                })
+                .ToList();
 
-            // Convert to DTOs
-            var organizationDtos = activeMemberships.Select(membership => new OrganizationSummaryDto
-            {
-                Id = membership.Organization.Id,
-                Name = membership.Organization.Name,
-                Role = membership.Role.ToString(),
-                IsActive = membership.IsActive
-            }).ToList();
-
-            _logger.LogDebug("Retrieved {Count} organizations for user {UserId}", organizationDtos.Count, userId);
-            return organizationDtos;
+            return ServiceResult<List<OrganizationSummaryDto>>.Success(organizations, "User organizations retrieved successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting organizations for user {UserId}", userId);
-            throw;
+            _logger.LogError(ex, "Error retrieving organizations for user {UserId}", userId);
+            return ServiceResult<List<OrganizationSummaryDto>>.Failure("An error occurred while retrieving user organizations", "INTERNAL_ERROR");
         }
     }
 }
 
-/// <summary>
-/// Authentication service interface
-/// </summary>
 public interface IAuthService
 {
-    Task<AuthResult> LoginAsync(string email, string password);
-    Task<AuthResult> RegisterAsync(RegisterRequest request);
-    Task<AuthResult> RefreshTokenAsync(string refreshToken);
-    Task<AuthResult> RevokeRefreshTokenAsync(string refreshToken);
-    Task<AuthResult> RevokeAllUserRefreshTokensAsync(Guid userId);
-    Task<AuthResult> ForgotPasswordAsync(string email);
-    Task<AuthResult> ResetPasswordAsync(string token, string newPassword);
-    Task<List<OrganizationSummaryDto>> GetUserOrganizationsAsync(Guid userId);
-}
-
-/// <summary>
-/// Authentication result
-/// </summary>
-public class AuthResult
-{
-    public bool IsSuccess { get; private set; }
-    public string Message { get; private set; } = string.Empty;
-    public string? AccessToken { get; private set; }
-    public string? RefreshToken { get; private set; }
-    public AuthUserInfo? User { get; private set; }
-
-    private AuthResult(bool isSuccess, string message)
-    {
-        IsSuccess = isSuccess;
-        Message = message;
-    }
-
-    public static AuthResult Success(string message) => new(true, message);
-
-    public static AuthResult Success(string accessToken, string refreshToken, AuthUserInfo user) => new(true, "Login successful")
-    {
-        AccessToken = accessToken,
-        RefreshToken = refreshToken,
-        User = user
-    };
-
-    public static AuthResult Success(AuthUserInfo user) => new(true, "Token validation successful")
-    {
-        User = user
-    };
-
-    public static AuthResult Failure(string message) => new(false, message);
+    Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password);
+    Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request);
+    Task<ServiceResult<RefreshResponse>> RefreshTokenAsync(string refreshToken);
+    Task<ServiceResult<LogoutResponse>> RevokeRefreshTokenAsync(string refreshToken);
+    Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId);
+    Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email);
+    Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword);
+    Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId);
 }

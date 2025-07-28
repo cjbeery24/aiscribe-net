@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Interfaces;
+using SermonTranscription.Application.Common;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
@@ -34,307 +35,433 @@ public class SubscriptionService : ISubscriptionService
     /// <summary>
     /// Get the current active subscription for an organization
     /// </summary>
-    public async Task<SubscriptionResponse?> GetCurrentSubscriptionAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse?>> GetCurrentSubscriptionAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
-        return subscription != null ? _mapper.Map<SubscriptionResponse>(subscription) : null;
+        try
+        {
+            var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
+            var response = subscription != null ? _mapper.Map<SubscriptionResponse>(subscription) : null;
+            return ServiceResult<SubscriptionResponse?>.Success(response, "Current subscription retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving current subscription for organization {OrganizationId}", organizationId);
+            return ServiceResult<SubscriptionResponse?>.Failure("An error occurred while retrieving the current subscription", "INTERNAL_ERROR");
+        }
     }
 
     /// <summary>
     /// Get all subscriptions for an organization
     /// </summary>
-    public async Task<IEnumerable<SubscriptionResponse>> GetOrganizationSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<IEnumerable<SubscriptionResponse>>> GetOrganizationSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var subscriptions = await _subscriptionRepository.GetByOrganizationAsync(organizationId, cancellationToken);
-        return _mapper.Map<IEnumerable<SubscriptionResponse>>(subscriptions);
+        try
+        {
+            var subscriptions = await _subscriptionRepository.GetByOrganizationAsync(organizationId, cancellationToken);
+            var response = _mapper.Map<IEnumerable<SubscriptionResponse>>(subscriptions);
+            return ServiceResult<IEnumerable<SubscriptionResponse>>.Success(response, "Organization subscriptions retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subscriptions for organization {OrganizationId}", organizationId);
+            return ServiceResult<IEnumerable<SubscriptionResponse>>.Failure("An error occurred while retrieving organization subscriptions", "INTERNAL_ERROR");
+        }
     }
 
     /// <summary>
     /// Create a new subscription for an organization
     /// </summary>
-    public async Task<SubscriptionResponse> CreateSubscriptionAsync(Guid organizationId, SubscriptionPlan plan, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> CreateSubscriptionAsync(Guid organizationId, SubscriptionPlan plan, CancellationToken cancellationToken = default)
     {
-        // Verify organization exists
-        var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
-        if (organization == null)
+        try
         {
-            throw new OrganizationDomainException($"Organization with ID {organizationId} not found");
+            // Verify organization exists
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+            if (organization == null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure($"Organization with ID {organizationId} not found", "NOT_FOUND");
+            }
+
+            // Check if organization already has an active subscription
+            var existingSubscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
+            if (existingSubscription != null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Organization already has an active subscription", "CONFLICT");
+            }
+
+            // Create new subscription
+            var subscription = new Subscription
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                Plan = plan,
+                Status = SubscriptionStatus.Active,
+                StartDate = DateTime.UtcNow,
+                UsageResetDate = DateTime.UtcNow.AddMonths(1),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            // Set plan-specific limits
+            subscription.UpdatePlanLimits();
+
+            await _subscriptionRepository.AddAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Created subscription {SubscriptionId} for organization {OrganizationId} with plan {Plan}",
+                subscription.Id, organizationId, plan);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Subscription created successfully");
         }
-
-        // Check if organization already has an active subscription
-        var existingSubscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
-        if (existingSubscription != null)
+        catch (Exception ex)
         {
-            throw new OrganizationDomainException($"Organization already has an active subscription");
+            _logger.LogError(ex, "Error creating subscription for organization {OrganizationId} with plan {Plan}", organizationId, plan);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while creating the subscription", "INTERNAL_ERROR");
         }
-
-        // Create new subscription
-        var subscription = new Subscription
-        {
-            Id = Guid.NewGuid(),
-            OrganizationId = organizationId,
-            Plan = plan,
-            Status = SubscriptionStatus.Active,
-            StartDate = DateTime.UtcNow,
-            UsageResetDate = DateTime.UtcNow.AddMonths(1),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        // Set plan-specific limits
-        subscription.UpdatePlanLimits();
-
-        await _subscriptionRepository.AddAsync(subscription, cancellationToken);
-        await _subscriptionRepository.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Created subscription {SubscriptionId} for organization {OrganizationId} with plan {Plan}",
-            subscription.Id, organizationId, plan);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
     }
 
     /// <summary>
     /// Upgrade or downgrade a subscription plan
     /// </summary>
-    public async Task<SubscriptionResponse> ChangeSubscriptionPlanAsync(Guid subscriptionId, SubscriptionPlan newPlan, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> ChangeSubscriptionPlanAsync(Guid subscriptionId, SubscriptionPlan newPlan, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"Subscription with ID {subscriptionId} not found");
-        }
-
-        if (!subscription.IsActive)
-        {
-            throw new SubscriptionDomainException("Cannot change plan for inactive subscription");
-        }
-
-        var oldPlan = subscription.Plan;
-
-        if (newPlan != subscription.Plan)
-        {
-            subscription.ChangePlan(newPlan);
-            if (newPlan > oldPlan)
+            var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
+            if (subscription == null)
             {
-                _logger.LogInformation("Upgraded subscription {SubscriptionId} from {OldPlan} to {NewPlan}",
-                    subscriptionId, oldPlan, newPlan);
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+            }
+
+            if (!subscription.IsActive)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Cannot change plan for inactive subscription", "FORBIDDEN");
+            }
+
+            var oldPlan = subscription.Plan;
+
+            if (newPlan != subscription.Plan)
+            {
+                subscription.ChangePlan(newPlan);
+                if (newPlan > oldPlan)
+                {
+                    _logger.LogInformation("Upgraded subscription {SubscriptionId} from {OldPlan} to {NewPlan}",
+                        subscriptionId, oldPlan, newPlan);
+                }
+                else
+                {
+                    _logger.LogInformation("Downgraded subscription {SubscriptionId} from {OldPlan} to {NewPlan}",
+                        subscriptionId, oldPlan, newPlan);
+                }
             }
             else
             {
-                _logger.LogInformation("Downgraded subscription {SubscriptionId} from {OldPlan} to {NewPlan}",
-                    subscriptionId, oldPlan, newPlan);
+                _logger.LogInformation("Subscription {SubscriptionId} plan unchanged: {Plan}", subscriptionId, newPlan);
             }
+
+            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Subscription plan changed successfully");
         }
-        else
+        catch (Exception ex)
         {
-            _logger.LogWarning("Attempted to change subscription {SubscriptionId} to same plan {Plan}",
-                subscriptionId, newPlan);
-            return _mapper.Map<SubscriptionResponse>(subscription);
+            _logger.LogError(ex, "Error changing subscription plan for subscription {SubscriptionId} to {NewPlan}", subscriptionId, newPlan);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while changing the subscription plan", "INTERNAL_ERROR");
         }
-
-        await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
     }
 
     /// <summary>
     /// Cancel a subscription
     /// </summary>
-    public async Task<SubscriptionResponse> CancelSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> CancelSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"Subscription with ID {subscriptionId} not found");
-        }
+            var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+            }
 
-        if (subscription.IsCancelled)
+            if (!subscription.IsCancelled)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already cancelled", "CONFLICT");
+            }
+
+            subscription.Cancel();
+            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Cancelled subscription {SubscriptionId}", subscriptionId);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Subscription cancelled successfully");
+        }
+        catch (Exception ex)
         {
-            throw new SubscriptionDomainException("Subscription is already cancelled");
+            _logger.LogError(ex, "Error cancelling subscription {SubscriptionId}", subscriptionId);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while cancelling the subscription", "INTERNAL_ERROR");
         }
-
-        subscription.Cancel();
-        await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
-
-        _logger.LogInformation("Cancelled subscription {SubscriptionId}", subscriptionId);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
     }
 
     /// <summary>
     /// Reactivate a cancelled or suspended subscription
     /// </summary>
-    public async Task<SubscriptionResponse> ReactivateSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> ReactivateSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"Subscription with ID {subscriptionId} not found");
-        }
+            var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+            }
 
-        if (subscription.IsActive)
+            if (subscription.IsActive)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Subscription is already active", "CONFLICT");
+            }
+
+            subscription.Reactivate();
+            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Reactivated subscription {SubscriptionId}", subscriptionId);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Subscription reactivated successfully");
+        }
+        catch (Exception ex)
         {
-            throw new SubscriptionDomainException("Subscription is already active");
+            _logger.LogError(ex, "Error reactivating subscription {SubscriptionId}", subscriptionId);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while reactivating the subscription", "INTERNAL_ERROR");
         }
-
-        subscription.Reactivate();
-        await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
-
-        _logger.LogInformation("Reactivated subscription {SubscriptionId}", subscriptionId);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
     }
 
     /// <summary>
     /// Track usage of transcription minutes
     /// </summary>
-    public async Task<SubscriptionResponse> TrackTranscriptionUsageAsync(Guid subscriptionId, int minutesUsed, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> TrackTranscriptionUsageAsync(Guid subscriptionId, int minutesUsed, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"Subscription with ID {subscriptionId} not found");
-        }
+            var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+            }
 
-        if (!subscription.IsActive)
+            if (!subscription.IsActive)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Cannot track usage for inactive subscription", "FORBIDDEN");
+            }
+
+            if (!subscription.CanUseTranscriptionMinutes(minutesUsed))
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Insufficient transcription minutes remaining.", "VALIDATION_ERROR", "minutesUsed");
+            }
+
+            subscription.UseTranscriptionMinutes(minutesUsed);
+            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Tracked {MinutesUsed} minutes usage for subscription {SubscriptionId}", minutesUsed, subscriptionId);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Usage tracked successfully");
+        }
+        catch (Exception ex)
         {
-            throw new SubscriptionDomainException("Cannot track usage for inactive subscription");
+            _logger.LogError(ex, "Error tracking usage for subscription {SubscriptionId}", subscriptionId);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while tracking usage", "INTERNAL_ERROR");
         }
-
-        if (!subscription.CanUseTranscriptionMinutes(minutesUsed))
-        {
-            throw new SubscriptionDomainException($"Insufficient transcription minutes remaining. Requested: {minutesUsed}, Available: {subscription.RemainingTranscriptionMinutes}");
-        }
-
-        subscription.UseTranscriptionMinutes(minutesUsed);
-        await _subscriptionRepository.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Tracked {MinutesUsed} transcription minutes for subscription {SubscriptionId}. Remaining: {RemainingMinutes}",
-            minutesUsed, subscriptionId, subscription.RemainingTranscriptionMinutes);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
     }
 
     /// <summary>
     /// Reset monthly usage for a subscription
     /// </summary>
-    public async Task<SubscriptionResponse> ResetMonthlyUsageAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionResponse>> ResetMonthlyUsageAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"Subscription with ID {subscriptionId} not found");
+            var subscription = await _subscriptionRepository.GetByIdAsync(subscriptionId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", "NOT_FOUND");
+            }
+
+            subscription.ResetUsage();
+            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Reset monthly usage for subscription {SubscriptionId}", subscriptionId);
+
+            var response = _mapper.Map<SubscriptionResponse>(subscription);
+            return ServiceResult<SubscriptionResponse>.Success(response, "Monthly usage reset successfully");
         }
-
-        subscription.ResetUsage();
-        await _subscriptionRepository.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Reset monthly usage for subscription {SubscriptionId}", subscriptionId);
-
-        return _mapper.Map<SubscriptionResponse>(subscription);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting monthly usage for subscription {SubscriptionId}", subscriptionId);
+            return ServiceResult<SubscriptionResponse>.Failure("An error occurred while resetting monthly usage", "INTERNAL_ERROR");
+        }
     }
 
     /// <summary>
     /// Check if an organization can use transcription minutes based on subscription limits
     /// </summary>
-    public async Task<bool> CanUseTranscriptionMinutesAsync(Guid organizationId, int minutes, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<bool>> CanUseTranscriptionMinutesAsync(Guid organizationId, int minutes, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
-        return subscription?.CanUseTranscriptionMinutes(minutes) ?? false;
+        try
+        {
+            var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<bool>.Failure("No active subscription found for organization", "NOT_FOUND");
+            }
+
+            var canUse = subscription.CanUseTranscriptionMinutes(minutes);
+            return ServiceResult<bool>.Success(canUse, "Usage check completed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking transcription minutes usage for organization {OrganizationId}", organizationId);
+            return ServiceResult<bool>.Failure("An error occurred while checking usage", "INTERNAL_ERROR");
+        }
     }
 
     /// <summary>
     /// Get subscription usage analytics for an organization
     /// </summary>
-    public async Task<SubscriptionUsageResponse> GetUsageAnalyticsAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<SubscriptionUsageResponse>> GetUsageAnalyticsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
-        if (subscription == null)
+        try
         {
-            throw new SubscriptionDomainException($"No active subscription found for organization {organizationId}");
-        }
+            var subscription = await _subscriptionRepository.GetActiveByOrganizationAsync(organizationId, cancellationToken);
+            if (subscription == null)
+            {
+                return ServiceResult<SubscriptionUsageResponse>.Failure("No active subscription found for organization", "NOT_FOUND");
+            }
 
-        var totalUsage = await _subscriptionRepository.GetTotalUsageMinutesAsync(organizationId, null, cancellationToken);
-
-        return new SubscriptionUsageResponse
-        {
-            OrganizationId = organizationId,
-            CurrentPlan = subscription.Plan,
-            PlanName = subscription.Plan.ToString(),
-            MonthlyLimit = subscription.MaxTranscriptionMinutes,
-            MinutesUsed = subscription.TranscriptionMinutesUsed,
-            MinutesRemaining = subscription.RemainingTranscriptionMinutes,
-            TotalUsage = totalUsage,
-            UsagePercentage = subscription.MaxTranscriptionMinutes > 0
+            var response = new SubscriptionUsageResponse
+            {
+                OrganizationId = organizationId,
+                CurrentPlan = subscription.Plan,
+                PlanName = subscription.Plan.ToString(),
+                MonthlyLimit = subscription.MaxTranscriptionMinutes,
+                MinutesUsed = subscription.TranscriptionMinutesUsed,
+                MinutesRemaining = subscription.RemainingTranscriptionMinutes,
+                TotalUsage = subscription.TranscriptionMinutesUsed,
+                UsagePercentage = subscription.MaxTranscriptionMinutes > 0
                 ? (decimal)subscription.TranscriptionMinutesUsed / subscription.MaxTranscriptionMinutes * 100
                 : 0,
-            UsageResetDate = subscription.UsageResetDate,
-            IsNearLimit = subscription.RemainingTranscriptionMinutes <= 120 // 2 hours in minutes
-        };
+                UsageResetDate = subscription.UsageResetDate,
+                IsNearLimit = subscription.RemainingTranscriptionMinutes <= 120,
+            };
+
+            return ServiceResult<SubscriptionUsageResponse>.Success(response, "Usage analytics retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving usage analytics for organization {OrganizationId}", organizationId);
+            return ServiceResult<SubscriptionUsageResponse>.Failure("An error occurred while retrieving usage analytics", "INTERNAL_ERROR");
+        }
     }
 
     /// <summary>
     /// Get available subscription plans with their features and pricing
     /// </summary>
-    public Task<IEnumerable<SubscriptionPlanResponse>> GetAvailablePlansAsync(CancellationToken cancellationToken = default)
+    public Task<ServiceResult<IEnumerable<SubscriptionPlanResponse>>> GetAvailablePlansAsync(CancellationToken cancellationToken = default)
     {
-        var plans = new List<SubscriptionPlanResponse>();
-
-        foreach (SubscriptionPlan plan in Enum.GetValues(typeof(SubscriptionPlan)))
+        try
         {
-            var tempSubscription = new Subscription { Plan = plan };
-            tempSubscription.UpdatePlanLimits();
+            var plans = Enum.GetValues<SubscriptionPlan>()
+                .Select(plan => new SubscriptionPlanResponse
+                {
+                    Plan = plan,
+                    PlanName = GetPlanDisplayName(plan),
+                    MonthlyPrice = GetPlanPrice(plan),
+                    YearlyPrice = GetPlanPrice(plan) * 12,
+                    MaxTranscriptionMinutes = GetPlanMinutesLimit(plan),
+                    CanExportTranscriptions = plan == SubscriptionPlan.Basic || plan == SubscriptionPlan.Professional || plan == SubscriptionPlan.Enterprise,
+                    HasRealtimeTranscription = plan == SubscriptionPlan.Professional || plan == SubscriptionPlan.Enterprise,
+                    HasPrioritySupport = plan == SubscriptionPlan.Professional || plan == SubscriptionPlan.Enterprise,
+                    Features = GetPlanFeatures(plan)
+                })
+                .ToList();
 
-            plans.Add(new SubscriptionPlanResponse
-            {
-                Plan = plan,
-                PlanName = plan.ToString(),
-                MonthlyPrice = tempSubscription.MonthlyPrice,
-                YearlyPrice = tempSubscription.YearlyPrice,
-                MaxTranscriptionMinutes = tempSubscription.MaxTranscriptionMinutes,
-                CanExportTranscriptions = tempSubscription.CanExportTranscriptions,
-                HasRealtimeTranscription = tempSubscription.HasRealtimeTranscription,
-                HasPrioritySupport = tempSubscription.HasPrioritySupport,
-                Features = GetPlanFeatures(plan)
-            });
+            return Task.FromResult(ServiceResult<IEnumerable<SubscriptionPlanResponse>>.Success(plans, "Available plans retrieved successfully"));
         }
-
-        return Task.FromResult<IEnumerable<SubscriptionPlanResponse>>(plans);
-    }
-
-    private static List<string> GetPlanFeatures(SubscriptionPlan plan)
-    {
-        return plan switch
+        catch (Exception ex)
         {
-            SubscriptionPlan.Basic => new List<string>
-            {
-                "Unlimited users",
-                "6 hours of transcription per month",
-                "Real-time transcription",
-                "Export transcriptions",
-                "Email support"
-            },
-            SubscriptionPlan.Professional => new List<string>
-            {
-                "Unlimited users",
-                "10 hours of transcription per month",
-                "Real-time transcription",
-                "Export transcriptions",
-                "Priority support",
-                "Advanced analytics"
-            },
-            SubscriptionPlan.Enterprise => new List<string>
-            {
-                "Unlimited users",
-                "14 hours of transcription per month",
-                "Real-time transcription",
-                "Export transcriptions",
-                "Priority support",
-                "Advanced analytics",
-                "Custom integrations",
-                "Dedicated account manager"
-            },
-            _ => new List<string>()
-        };
+            _logger.LogError(ex, "Error retrieving available subscription plans");
+            return Task.FromResult(ServiceResult<IEnumerable<SubscriptionPlanResponse>>.Failure("An error occurred while retrieving available plans", "INTERNAL_ERROR"));
+        }
     }
+
+    private static string GetPlanDisplayName(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Basic => "Basic",
+        SubscriptionPlan.Professional => "Professional",
+        SubscriptionPlan.Enterprise => "Enterprise",
+        _ => plan.ToString()
+    };
+
+    private static string GetPlanDescription(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Basic => "Ideal for growing churches with regular sermon transcription needs",
+        SubscriptionPlan.Professional => "Advanced features for larger churches and organizations with high transcription volume",
+        SubscriptionPlan.Enterprise => "Custom solutions for large organizations with specific requirements",
+        _ => "Subscription plan"
+    };
+
+    private static decimal GetPlanPrice(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Basic => 29.99m,
+        SubscriptionPlan.Professional => 79.99m,
+        SubscriptionPlan.Enterprise => 199.99m,
+        _ => 0.00m
+    };
+
+    private static int GetPlanMinutesLimit(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Basic => 300,
+        SubscriptionPlan.Professional => 1000,
+        SubscriptionPlan.Enterprise => 5000,
+        _ => 0
+    };
+
+    private static List<string> GetPlanFeatures(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Basic => new List<string>
+        {
+            "300 minutes of transcription per month",
+            "Improved transcription accuracy",
+            "Email support",
+            "Export to common formats"
+        },
+        SubscriptionPlan.Professional => new List<string>
+        {
+            "1000 minutes of transcription per month",
+            "High transcription accuracy",
+            "Priority support",
+            "Advanced export options",
+            "Custom vocabulary training",
+            "Analytics dashboard"
+        },
+        SubscriptionPlan.Enterprise => new List<string>
+        {
+            "5000 minutes of transcription per month",
+            "Highest transcription accuracy",
+            "Dedicated support",
+            "Custom integrations",
+            "Advanced analytics",
+            "Custom vocabulary training",
+            "API access",
+            "Custom branding"
+        },
+        _ => new List<string>()
+    };
 }

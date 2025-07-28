@@ -10,8 +10,5 @@ public class CreateSubscriptionRequestValidator : AbstractValidator<CreateSubscr
     {
         RuleFor(x => x.Plan)
             .IsInEnum().WithMessage("Invalid subscription plan");
-
-        RuleFor(x => x.OrganizationId)
-            .NotEmpty().WithMessage("Organization ID is required");
     }
 }

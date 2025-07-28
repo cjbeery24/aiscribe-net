@@ -47,19 +47,19 @@ public class OrganizationService : IOrganizationService
             var creatingUser = await _userRepository.GetByIdAsync(createdByUserId, cancellationToken);
             if (creatingUser == null)
             {
-                return ServiceResult<OrganizationResponse>.Failure("Creating user not found");
+                return ServiceResult<OrganizationResponse>.Failure("Creating user not found", "NOT_FOUND");
             }
 
             if (!creatingUser.IsActive)
             {
-                return ServiceResult<OrganizationResponse>.Failure("Creating user is not active");
+                return ServiceResult<OrganizationResponse>.Failure("Creating user is not active", "FORBIDDEN");
             }
 
             // Check if organization name already exists
             var existingOrganizations = await _organizationRepository.SearchByNameAsync(request.Name, cancellationToken);
             if (existingOrganizations.Any(o => o.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase)))
             {
-                return ServiceResult<OrganizationResponse>.Failure($"An organization with the name '{request.Name}' already exists");
+                return ServiceResult<OrganizationResponse>.Failure($"An organization with the name '{request.Name}' already exists", "CONFLICT");
             }
 
             // Create new organization
@@ -86,7 +86,7 @@ public class OrganizationService : IOrganizationService
             // Check if slug already exists
             if (await _organizationRepository.SlugExistsAsync(organization.Slug!, cancellationToken))
             {
-                return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists");
+                return ServiceResult<OrganizationResponse>.Failure($"An organization with the slug '{organization.Slug}' already exists", "CONFLICT");
             }
 
             // Save organization
@@ -127,7 +127,7 @@ public class OrganizationService : IOrganizationService
             var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
             if (organization == null)
             {
-                return ServiceResult<OrganizationResponse>.Failure("Organization not found");
+                return ServiceResult<OrganizationResponse>.Failure("Organization not found", "NOT_FOUND");
             }
 
             var response = MapToOrganizationResponse(organization);

@@ -43,9 +43,9 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         var response = await HttpClient.PostAsync("/api/v1.0/organizations", CreateJsonContent(request));
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.OK);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Created);
 
-        var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.Name.Should().Be(request.Name);
         result.Description.Should().Be(request.Description);
@@ -131,7 +131,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.Id.Should().Be(organization.Id);
         result.Name.Should().Be(organization.Name);
@@ -195,7 +195,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.Name.Should().Be(request.Name);
         result.Description.Should().Be(request.Description);
@@ -265,7 +265,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.MaxTranscriptionMinutes.Should().Be(request.MaxTranscriptionMinutes);
         result.CanExportTranscriptions.Should().Be(request.CanExportTranscriptions!.Value);
@@ -299,7 +299,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationResponse>(response);
         result.Should().NotBeNull();
         result!.LogoUrl.Should().Be(request.LogoUrl);
 
@@ -386,7 +386,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationWithUsersResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationWithUsersResponse>(response);
         result.Should().NotBeNull();
         result!.Id.Should().Be(organization.Id);
         result.Name.Should().Be(organization.Name);
@@ -442,7 +442,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<OrganizationWithSubscriptionsResponse>(response);
+        var result = await ReadApiResponseAsync<OrganizationWithSubscriptionsResponse>(response);
         result.Should().NotBeNull();
         result!.Id.Should().Be(organization.Id);
         result.Name.Should().Be(organization.Name);

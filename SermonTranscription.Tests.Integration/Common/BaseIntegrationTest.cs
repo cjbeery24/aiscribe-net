@@ -17,6 +17,7 @@ using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Application.Interfaces;
 using SermonTranscription.Infrastructure.Services;
 using SermonTranscription.Application.Services;
+using SermonTranscription.Application.DTOs;
 using Moq;
 using StackExchange.Redis;
 
@@ -317,6 +318,20 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
+    }
+
+    protected static async Task<T?> ReadApiResponseAsync<T>(HttpResponseMessage response) where T : class
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(content))
+            return default;
+
+        var apiResponse = JsonSerializer.Deserialize<ApiResponse<T>>(content, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        return apiResponse?.Data;
     }
 
     protected static async Task AssertSuccessStatusCodeAsync(HttpResponseMessage response)

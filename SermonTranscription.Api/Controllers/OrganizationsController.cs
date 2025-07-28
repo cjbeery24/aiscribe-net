@@ -1,9 +1,7 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application.DTOs;
-using SermonTranscription.Application.Services;
 using SermonTranscription.Application.Interfaces;
 
 namespace SermonTranscription.Api.Controllers;
@@ -30,30 +28,20 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Created organization details</returns>
     [HttpPost]
     [OrganizationAgnostic]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<OrganizationResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateOrganization([FromBody] CreateOrganizationRequest request)
     {
-        try
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
         {
-            var userId = GetCurrentUserId();
-            if (!userId.HasValue)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = "User not authenticated",
-                    Errors = ["Valid authentication required"]
-                });
-            }
+            return UnauthorizedError("User not authenticated");
+        }
 
-            var result = await _organizationService.CreateOrganizationAsync(request, userId.Value, HttpContext.RequestAborted);
-            return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, "Error creating organization");
-        }
+        var result = await _organizationService.CreateOrganizationAsync(request, userId.Value, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () =>
+            StatusCode(201, SuccessResponse(result.Data!, "Organization created successfully")));
     }
 
     /// <summary>
@@ -67,18 +55,10 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> LoadOrganization()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult<OrganizationResponse>(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error retrieving organization");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
-
 
     /// <summary>
     /// Update organization details
@@ -94,16 +74,9 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganization([FromBody] UpdateOrganizationRequest request)
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error updating organization");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 
     /// <summary>
@@ -120,16 +93,9 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganizationSettings([FromBody] UpdateOrganizationSettingsRequest request)
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error updating organization settings");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 
     /// <summary>
@@ -146,16 +112,9 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganizationLogo([FromBody] UpdateOrganizationLogoRequest request)
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error updating organization logo");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 
     /// <summary>
@@ -171,16 +130,9 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ActivateOrganization()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.ActivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error activating organization");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.ActivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => SuccessResponse("Organization activated successfully"));
     }
 
     /// <summary>
@@ -196,22 +148,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateOrganization()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.DeactivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(new SuccessResponse { Message = result.Message }));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error deactivating organization");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.DeactivateOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => SuccessResponse("Organization deactivated successfully"));
     }
 
     /// <summary>
     /// Get organization with users
     /// </summary>
-    /// <returns>Organization details with user information</returns>
+    /// <returns>Organization details with user list</returns>
     [HttpGet("users")]
     [RequireCanManageUsers]
     [ProducesResponseType(typeof(OrganizationWithUsersResponse), StatusCodes.Status200OK)]
@@ -220,22 +165,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationWithUsers()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error retrieving organization with users");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 
     /// <summary>
     /// Get organization with subscriptions
     /// </summary>
-    /// <returns>Organization details with subscription information</returns>
+    /// <returns>Organization details with subscription list</returns>
     [HttpGet("subscriptions")]
     [RequireOrganizationAdmin]
     [ProducesResponseType(typeof(OrganizationWithSubscriptionsResponse), StatusCodes.Status200OK)]
@@ -244,22 +182,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationWithSubscriptions()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error retrieving organization with subscriptions");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 
     /// <summary>
-    /// Get organization dashboard data with comprehensive statistics
+    /// Get organization dashboard data
     /// </summary>
-    /// <returns>Organization dashboard data with user activity, subscription status, and transcription statistics</returns>
+    /// <returns>Organization dashboard information</returns>
     [HttpGet("dashboard")]
     [ProducesResponseType(typeof(OrganizationDashboardResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -267,15 +198,8 @@ public class OrganizationsController : BaseAuthenticatedApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationDashboard()
     {
-        try
-        {
-            var tenantContext = HttpContext.GetTenantContext()!;
-            var result = await _organizationService.GetOrganizationDashboardAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-            return HandleServiceResult<OrganizationDashboardResponse>(result, () => Ok(result.Data));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex, $"Error retrieving organization dashboard data");
-        }
+        var tenantContext = HttpContext.GetTenantContext()!;
+        var result = await _organizationService.GetOrganizationDashboardAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        return HandleServiceResult(result, () => Ok(result.Data));
     }
 }

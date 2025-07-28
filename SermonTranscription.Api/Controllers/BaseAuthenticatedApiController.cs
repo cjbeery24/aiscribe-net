@@ -40,41 +40,33 @@ public abstract class BaseAuthenticatedApiController : BaseApiController
     }
 
     /// <summary>
-    /// Creates a standardized error response for unauthorized access
+    /// Creates a standardized error response for unauthorized access using ApiResponse wrapper
     /// </summary>
     /// <param name="message">Error message</param>
     /// <returns>Unauthorized response</returns>
     protected IActionResult UnauthorizedError(string message = "User not authenticated")
     {
-        return Unauthorized(new ErrorResponse
-        {
-            Message = message,
-            Errors = ["Valid authentication required"]
-        });
+        return UnauthorizedError(message, ["Valid authentication required"]);
     }
 
     /// <summary>
-    /// Creates a standardized error response for forbidden access
+    /// Creates a standardized error response for forbidden access using ApiResponse wrapper
     /// </summary>
     /// <param name="message">Error message</param>
     /// <returns>Forbidden response</returns>
     protected IActionResult ForbiddenError(string message = "Access denied")
     {
-        return Forbid();
+        return ForbiddenError(message, ["Insufficient permissions"]);
     }
 
     /// <summary>
-    /// Creates a standardized error response for not found
+    /// Creates a standardized error response for not found using ApiResponse wrapper
     /// </summary>
     /// <param name="message">Error message</param>
     /// <returns>Not found response</returns>
     protected IActionResult NotFoundError(string message = "Resource not found")
     {
-        return NotFound(new ErrorResponse
-        {
-            Message = message,
-            Errors = [message]
-        });
+        return NotFoundError(message, [message]);
     }
 
     #endregion

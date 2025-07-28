@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Application;
+using SermonTranscription.Application.DTOs;
 using SermonTranscription.Infrastructure;
 using Serilog;
 using System.Text;
@@ -234,32 +235,33 @@ try
     builder.Services.AddFluentValidationAutoValidation()
                     .AddFluentValidationClientsideAdapters();
 
-    // Log discovered validators (for debugging)
-    var validators = builder.Services.Where(s => s.ServiceType.Name.Contains("Validator")).ToList();
-    Log.Information("Discovered {ValidatorCount} FluentValidation validators", validators.Count);
-    foreach (var validator in validators)
-    {
-        Log.Information("Found validator: {ValidatorType}", validator.ServiceType.Name);
-    }
-
-    // Configure validation error response format
+    // Configure validation error response format with enhanced details
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
         {
-            var errors = context.ModelState
+            var validationErrors = context.ModelState
                 .Where(x => x.Value?.Errors.Count > 0)
-                .SelectMany(x => x.Value!.Errors)
-                .Select(x => x.ErrorMessage ?? "Unknown validation error")
+                .SelectMany(x => x.Value!.Errors.Select(error => new ValidationError
+                {
+                    Field = x.Key,
+                    Message = error.ErrorMessage ?? "Unknown validation error",
+                    ErrorCode = "VALIDATION_ERROR",
+                    AttemptedValue = context.ModelState[x.Key]?.AttemptedValue
+                }))
                 .ToArray();
 
-            var errorResponse = new SermonTranscription.Application.DTOs.ErrorResponse
+            var errorMessages = validationErrors.Select(e => e.Message).ToArray();
+
+            var validationErrorResponse = new ValidationErrorResponse
             {
                 Message = "Invalid request data",
-                Errors = errors
+                Errors = errorMessages,
+                ValidationErrors = validationErrors,
+                TraceId = context.HttpContext.TraceIdentifier
             };
 
-            return new BadRequestObjectResult(errorResponse);
+            return new BadRequestObjectResult(validationErrorResponse);
         };
     });
 
@@ -284,6 +286,9 @@ try
 
     // Security Headers
     app.UseHttpsRedirection();
+
+    // Global Exception Handling (must be early in pipeline)
+    app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
     // Request/Response Logging (before authentication to capture all requests)
     app.UseMiddleware<RequestResponseLoggingMiddleware>();

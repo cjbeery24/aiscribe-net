@@ -8,5 +8,4 @@ namespace SermonTranscription.Application.DTOs;
 public class CreateSubscriptionRequest
 {
     public SubscriptionPlan Plan { get; set; }
-    public Guid OrganizationId { get; set; }
 }

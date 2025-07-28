@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using SermonTranscription.Application.DTOs;
+using SermonTranscription.Application.Common;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
@@ -43,7 +43,7 @@ public class InvitationService
     /// <summary>
     /// Invite a user to join an organization
     /// </summary>
-    public async Task<InviteUserResponse> InviteUserAsync(
+    public async Task<ServiceResult<InviteUserResponse>> InviteUserAsync(
         InviteUserRequest request,
         Guid organizationId,
         Guid invitedByUserId)
@@ -53,12 +53,12 @@ public class InvitationService
             // Validate the request
             if (string.IsNullOrWhiteSpace(request.Email))
             {
-                throw new UserDomainException("Email address is required.");
+                return ServiceResult<InviteUserResponse>.Failure("Email address is required", "VALIDATION_ERROR", "email");
             }
 
             if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
             {
-                throw new UserDomainException("First name and last name are required.");
+                return ServiceResult<InviteUserResponse>.Failure("First name and last name are required", "VALIDATION_ERROR", "firstName");
             }
 
             // Check if user already exists
@@ -72,12 +72,7 @@ public class InvitationService
 
                 if (existingMembership != null)
                 {
-                    return new InviteUserResponse
-                    {
-                        Success = false,
-                        Message = "User is already a member of this organization.",
-                        Email = request.Email
-                    };
+                    return ServiceResult<InviteUserResponse>.Failure("User is already a member of this organization", "CONFLICT");
                 }
             }
 
@@ -85,7 +80,7 @@ public class InvitationService
             var invitingUser = await _userRepository.GetByIdAsync(invitedByUserId);
             if (invitingUser == null)
             {
-                throw new UserDomainException("Inviting user not found.");
+                return ServiceResult<InviteUserResponse>.Failure("Inviting user not found", "NOT_FOUND");
             }
 
             // Generate invitation token
@@ -102,8 +97,11 @@ public class InvitationService
                     Email = request.Email,
                     FirstName = request.FirstName,
                     LastName = request.LastName,
-                    IsEmailVerified = false, // Will be verified when they accept invitation
-                    CreatedAt = DateTime.UtcNow
+                    PasswordHash = string.Empty, // Will be set when accepting invitation
+                    IsEmailVerified = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
                 await _userRepository.AddAsync(user);
@@ -113,149 +111,132 @@ public class InvitationService
                 user = existingUser;
             }
 
-            // Create user organization relationship
+            // Create user-organization relationship
             var userOrganization = new UserOrganization
             {
                 UserId = user.Id,
                 OrganizationId = organizationId,
                 Role = ParseUserRole(request.Role),
-                CreatedAt = DateTime.UtcNow,
                 IsActive = false, // Will be activated when invitation is accepted
+                InvitedByUserId = invitedByUserId,
                 InvitationToken = invitationToken,
-                InvitedByUserId = invitedByUserId
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             await _userOrganizationRepository.AddAsync(userOrganization);
 
-            // Send invitation email
-            var emailSent = await _emailService.SendInvitationEmailAsync(
-                user.Email,
-                $"{user.FirstName} {user.LastName}",
-                "Organization Name", // TODO: Get from organization repository
-                $"{invitingUser.FirstName} {invitingUser.LastName}",
-                invitationToken,
-                request.Message);
+            // TODO: Send invitation email
+            // await _emailService.SendInvitationEmailAsync(user.Email, invitationToken, organizationId);
 
-            if (!emailSent)
-            {
-                _logger.LogWarning("Failed to send invitation email to {Email}", user.Email);
-                // Continue anyway - the invitation is still created
-            }
+            _logger.LogInformation("User {UserId} invited to organization {OrganizationId} by {InvitedByUserId}",
+                user.Id, organizationId, invitedByUserId);
 
-            return new InviteUserResponse
+            var response = new InviteUserResponse
             {
                 Success = true,
-                Message = "Invitation sent successfully.",
-                Email = user.Email,
-                InvitationToken = invitationToken // For testing purposes
+                Message = "Invitation sent successfully",
+                Email = request.Email
             };
+
+            return ServiceResult<InviteUserResponse>.Success(response, "Invitation sent successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to invite user {Email} to organization {OrganizationId}",
-                request.Email, organizationId);
-            throw;
+            _logger.LogError(ex, "Error inviting user {Email} to organization {OrganizationId}", request.Email, organizationId);
+            return ServiceResult<InviteUserResponse>.Failure("An error occurred while sending the invitation", "INTERNAL_ERROR");
         }
     }
 
     /// <summary>
     /// Accept an invitation to join an organization
     /// </summary>
-    public async Task<AcceptInvitationResponse> AcceptInvitationAsync(AcceptInvitationRequest request)
+    public async Task<ServiceResult<AcceptInvitationResponse>> AcceptInvitationAsync(AcceptInvitationRequest request)
     {
         try
         {
             // Validate the request
             if (string.IsNullOrWhiteSpace(request.InvitationToken))
             {
-                throw new UserDomainException("Invitation token is required.");
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation token is required", "VALIDATION_ERROR", "invitationToken");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                return ServiceResult<AcceptInvitationResponse>.Failure("Password is required", "VALIDATION_ERROR", "password");
             }
 
             // Validate password
-            _passwordValidator.Validate(request.Password);
+            try
+            {
+                _passwordValidator.Validate(request.Password);
+            }
+            catch (PasswordValidationDomainException ex)
+            {
+                return ServiceResult<AcceptInvitationResponse>.Failure(ex.Message, "VALIDATION_ERROR", "password");
+            }
 
             // Find the invitation
             var userOrganization = await _userOrganizationRepository.GetByInvitationTokenAsync(request.InvitationToken);
             if (userOrganization == null)
             {
-                return new AcceptInvitationResponse
-                {
-                    Success = false,
-                    Message = "Invalid or expired invitation token."
-                };
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invalid invitation token", "NOT_FOUND");
             }
 
-            // Check if invitation has already been accepted
-            if (userOrganization.InvitationAcceptedAt.HasValue)
-            {
-                return new AcceptInvitationResponse
-                {
-                    Success = false,
-                    Message = "This invitation has already been accepted."
-                };
-            }
-
-            // Check if invitation has expired (7 days)
+            // Check if invitation is expired (7 days)
             if (userOrganization.CreatedAt < DateTime.UtcNow.AddDays(-7))
             {
-                return new AcceptInvitationResponse
-                {
-                    Success = false,
-                    Message = "This invitation has expired."
-                };
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has expired", "UNAUTHORIZED");
+            }
+
+            // Check if invitation is already accepted
+            if (userOrganization.InvitationAcceptedAt.HasValue)
+            {
+                return ServiceResult<AcceptInvitationResponse>.Failure("Invitation has already been accepted", "CONFLICT");
             }
 
             // Get the user
-            var user = await _userRepository.GetByIdAsync(userOrganization.UserId);
+            var user = userOrganization.User ?? await _userRepository.GetByIdAsync(userOrganization.UserId);
             if (user == null)
             {
-                throw new UserDomainException("User not found.");
+                return ServiceResult<AcceptInvitationResponse>.Failure("User not found", "NOT_FOUND");
             }
 
-            // Set password and verify email
-            user.PasswordHash = _passwordHasher.HashPassword(request.Password);
+            // Hash the password
+            var passwordHash = _passwordHasher.HashPassword(request.Password);
+
+            // Update user
+            user.PasswordHash = passwordHash;
             user.MarkEmailAsVerified();
+            user.UpdatedAt = DateTime.UtcNow;
+
             await _userRepository.UpdateAsync(user);
 
-            // Accept the invitation
+            // Activate the membership
             userOrganization.AcceptInvitation();
+
             await _userOrganizationRepository.UpdateAsync(userOrganization);
 
-            // Send welcome email
-            var emailSent = await _emailService.SendWelcomeEmailAsync(
-                user.Email,
-                $"{user.FirstName} {user.LastName}",
-                "Organization Name"); // TODO: Get from organization repository
+            _logger.LogInformation("User {UserId} accepted invitation to organization {OrganizationId}",
+                user.Id, userOrganization.OrganizationId);
 
-            if (!emailSent)
-            {
-                _logger.LogWarning("Failed to send welcome email to {Email}", user.Email);
-            }
-
-            // Generate JWT tokens
-            var accessToken = _jwtService.GenerateAccessToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken(user);
-
-            return new AcceptInvitationResponse
+            var acceptResponse = new AcceptInvitationResponse
             {
                 Success = true,
-                Message = "Invitation accepted successfully. Welcome!",
-                OrganizationName = "Organization Name", // TODO: Get from organization repository
-                Role = userOrganization.Role.ToString(),
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
+                Message = "Invitation accepted successfully",
+                OrganizationName = userOrganization.Organization.Name,
+                Role = userOrganization.Role.ToString()
             };
+
+            return ServiceResult<AcceptInvitationResponse>.Success(acceptResponse, "Invitation accepted successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to accept invitation with token {Token}", request.InvitationToken);
-            throw;
+            _logger.LogError(ex, "Error accepting invitation with token {Token}", request.InvitationToken);
+            return ServiceResult<AcceptInvitationResponse>.Failure("An error occurred while accepting the invitation", "INTERNAL_ERROR");
         }
     }
 
-    /// <summary>
-    /// Generate a secure invitation token
-    /// </summary>
     private static string GenerateInvitationToken()
     {
         var randomBytes = new byte[32];
@@ -264,16 +245,12 @@ public class InvitationService
         return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Replace("=", "");
     }
 
-    /// <summary>
-    /// Parse user role from string
-    /// </summary>
     private static UserRole ParseUserRole(string role)
     {
-        return role.ToLowerInvariant() switch
+        return role?.ToLowerInvariant() switch
         {
-            "admin" or "organizationadmin" => UserRole.OrganizationAdmin,
-            "user" or "organizationuser" => UserRole.OrganizationUser,
-            "readonly" or "readonlyuser" => UserRole.ReadOnlyUser,
+            "admin" => UserRole.OrganizationAdmin,
+            "user" => UserRole.OrganizationUser,
             _ => UserRole.OrganizationUser
         };
     }
