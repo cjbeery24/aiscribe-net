@@ -4,6 +4,7 @@ using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Common;
+using SermonTranscription.Application.Interfaces;
 
 namespace SermonTranscription.Application.Services;
 
@@ -35,7 +36,7 @@ public class AuthService : IAuthService
         _passwordValidator = passwordValidator;
     }
 
-    public async Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password)
+    public async Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -46,7 +47,7 @@ public class AuthService : IAuthService
             }
 
             // Find user by email
-            var user = await _userRepository.GetByEmailAsync(email);
+            var user = await _userRepository.GetByEmailAsync(email, cancellationToken);
             if (user == null)
             {
                 _logger.LogWarning("Login attempt with non-existent email: {Email}", email);
@@ -85,11 +86,11 @@ public class AuthService : IAuthService
 
             // Generate tokens (JWT contains only user identity, no tenant info)
             var accessToken = _jwtService.GenerateAccessToken(user);
-            var refreshToken = await IssueRefreshTokenAsync(user);
+            var refreshToken = await IssueRefreshTokenAsync(user, cancellationToken);
 
             // Update user's last login
             user.LastLoginAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation("Successful login for user {UserId}", user.Id);
 
@@ -115,7 +116,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request)
+    public async Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -126,7 +127,7 @@ public class AuthService : IAuthService
             }
 
             // Check if user already exists
-            var existingUser = await _userRepository.GetByEmailAsync(request.Email);
+            var existingUser = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
             if (existingUser != null)
             {
                 return ServiceResult<RegisterResponse>.Failure("User with this email already exists", ErrorCode.Conflict, "email", request.Email);
@@ -159,7 +160,7 @@ public class AuthService : IAuthService
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await _userRepository.AddAsync(user);
+            await _userRepository.AddAsync(user, cancellationToken);
 
             _logger.LogInformation("User registered successfully: {UserId}", user.Id);
 
@@ -177,7 +178,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<ServiceResult<RefreshResponse>> RefreshTokenAsync(string refreshToken)
+    public async Task<ServiceResult<RefreshResponse>> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -187,7 +188,7 @@ public class AuthService : IAuthService
             }
 
             // Find refresh token in database
-            var tokenEntity = await _userRepository.GetRefreshTokenAsync(refreshToken);
+            var tokenEntity = await _userRepository.GetRefreshTokenAsync(refreshToken, cancellationToken);
             if (tokenEntity == null)
             {
                 _logger.LogWarning("Refresh token not found: {Token}", refreshToken);
@@ -197,7 +198,7 @@ public class AuthService : IAuthService
             // Check if token is expired
             if (tokenEntity.ExpiresAt < DateTime.UtcNow)
             {
-                await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+                await _userRepository.RevokeRefreshTokenAsync(refreshToken, cancellationToken);
                 return ServiceResult<RefreshResponse>.Failure("Refresh token has expired", ErrorCode.Unauthorized);
             }
 
@@ -214,16 +215,16 @@ public class AuthService : IAuthService
             if (!user.IsActive)
             {
                 _logger.LogWarning("Refresh token used for inactive user: {UserId}", user.Id);
-                await _userRepository.RevokeAllUserRefreshTokensAsync(user.Id);
+                await _userRepository.RevokeAllUserRefreshTokensAsync(user.Id, cancellationToken);
                 return ServiceResult<RefreshResponse>.Failure("User account is deactivated", ErrorCode.Forbidden);
             }
 
             // Generate new tokens
             var newAccessToken = _jwtService.GenerateAccessToken(user);
-            var newRefreshToken = await IssueRefreshTokenAsync(user);
+            var newRefreshToken = await IssueRefreshTokenAsync(user, cancellationToken);
 
             // Revoke old refresh token
-            await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+            await _userRepository.RevokeRefreshTokenAsync(refreshToken, cancellationToken);
 
             _logger.LogInformation("Token refreshed successfully for user {UserId}", user.Id);
 
@@ -243,7 +244,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<ServiceResult<LogoutResponse>> RevokeRefreshTokenAsync(string refreshToken)
+    public async Task<ServiceResult<LogoutResponse>> RevokeRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -252,7 +253,7 @@ public class AuthService : IAuthService
                 return ServiceResult<LogoutResponse>.Failure("Refresh token is required", ErrorCode.ValidationError, "refreshToken");
             }
 
-            await _userRepository.RevokeRefreshTokenAsync(refreshToken);
+            await _userRepository.RevokeRefreshTokenAsync(refreshToken, cancellationToken);
 
             _logger.LogInformation("Refresh token revoked: {Token}", refreshToken);
 
@@ -270,17 +271,17 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId)
+    public async Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<LogoutResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
-            await _userRepository.RevokeAllUserRefreshTokensAsync(userId);
+            await _userRepository.RevokeAllUserRefreshTokensAsync(userId, cancellationToken);
 
             _logger.LogInformation("All refresh tokens revoked for user {UserId}", userId);
 
@@ -298,7 +299,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private async Task<string> IssueRefreshTokenAsync(User user)
+    private async Task<string> IssueRefreshTokenAsync(User user, CancellationToken cancellationToken = default)
     {
         var refreshToken = _jwtService.GenerateRefreshToken(user);
         var tokenEntity = new RefreshToken
@@ -309,11 +310,11 @@ public class AuthService : IAuthService
             CreatedAt = DateTime.UtcNow
         };
 
-        await _userRepository.AddRefreshTokenAsync(tokenEntity);
+        await _userRepository.AddRefreshTokenAsync(tokenEntity, cancellationToken);
         return refreshToken;
     }
 
-    public async Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email)
+    public async Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -322,7 +323,7 @@ public class AuthService : IAuthService
                 return ServiceResult<ForgotPasswordResponse>.Failure("Email is required", ErrorCode.ValidationError, "email");
             }
 
-            var user = await _userRepository.GetByEmailAsync(email);
+            var user = await _userRepository.GetByEmailAsync(email, cancellationToken);
             if (user == null)
             {
                 // Don't reveal if user exists or not for security
@@ -349,7 +350,7 @@ public class AuthService : IAuthService
             user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             // TODO: Send email with reset link
             _logger.LogInformation("Password reset token generated for user {UserId}: {Token}", user.Id, resetToken);
@@ -366,7 +367,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword)
+    public async Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -385,7 +386,7 @@ public class AuthService : IAuthService
                 return ServiceResult<ResetPasswordResponse>.Failure(ex.Message, ErrorCode.ValidationError, "newPassword");
             }
             // Find user by reset token
-            var user = await _userRepository.GetByPasswordResetTokenAsync(token);
+            var user = await _userRepository.GetByPasswordResetTokenAsync(token, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<ResetPasswordResponse>.Failure("Invalid or expired reset token", ErrorCode.Unauthorized);
@@ -407,7 +408,7 @@ public class AuthService : IAuthService
             user.PasswordResetTokenExpiry = null;
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             _logger.LogInformation("Password reset successfully for user {UserId}", user.Id);
 
@@ -430,17 +431,17 @@ public class AuthService : IAuthService
         return Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).Replace("+", "-").Replace("/", "_").Replace("=", "");
     }
 
-    public async Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId)
+    public async Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<List<OrganizationSummaryDto>>.Failure("User not found", ErrorCode.NotFound);
             }
 
-            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId);
+            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId, cancellationToken);
             var organizations = memberships
                 .Where(m => m.IsActive && m.Organization.IsActive)
                 .Select(m => new OrganizationSummaryDto
@@ -461,16 +462,4 @@ public class AuthService : IAuthService
             return ServiceResult<List<OrganizationSummaryDto>>.Failure("An error occurred while retrieving user organizations", ErrorCode.InternalError);
         }
     }
-}
-
-public interface IAuthService
-{
-    Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password);
-    Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request);
-    Task<ServiceResult<RefreshResponse>> RefreshTokenAsync(string refreshToken);
-    Task<ServiceResult<LogoutResponse>> RevokeRefreshTokenAsync(string refreshToken);
-    Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId);
-    Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email);
-    Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword);
-    Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId);
 }

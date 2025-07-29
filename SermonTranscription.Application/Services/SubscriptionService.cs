@@ -186,7 +186,7 @@ public class SubscriptionService : ISubscriptionService
                 return ServiceResult<SubscriptionResponse>.Failure($"Subscription with ID {subscriptionId} not found", ErrorCode.NotFound);
             }
 
-            if (!subscription.IsCancelled)
+            if (subscription.IsCancelled)
             {
                 return ServiceResult<SubscriptionResponse>.Failure("Subscription is already cancelled", ErrorCode.Conflict);
             }
@@ -257,6 +257,11 @@ public class SubscriptionService : ISubscriptionService
             if (!subscription.IsActive)
             {
                 return ServiceResult<SubscriptionResponse>.Failure("Cannot track usage for inactive subscription", ErrorCode.Forbidden);
+            }
+
+            if (minutesUsed < 0)
+            {
+                return ServiceResult<SubscriptionResponse>.Failure("Minutes used cannot be negative", ErrorCode.ValidationError, "minutesUsed");
             }
 
             if (!subscription.CanUseTranscriptionMinutes(minutesUsed))

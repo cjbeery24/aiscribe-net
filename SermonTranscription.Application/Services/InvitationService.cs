@@ -46,7 +46,8 @@ public class InvitationService
     public async Task<ServiceResult<InviteUserResponse>> InviteUserAsync(
         InviteUserRequest request,
         Guid organizationId,
-        Guid invitedByUserId)
+        Guid invitedByUserId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -62,13 +63,13 @@ public class InvitationService
             }
 
             // Check if user already exists
-            var existingUser = await _userRepository.GetByEmailAsync(request.Email);
+            var existingUser = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
 
             // Check if user is already a member of this organization
             if (existingUser != null)
             {
                 var existingMembership = await _userOrganizationRepository.GetUserOrganizationAsync(
-                    existingUser.Id, organizationId);
+                    existingUser.Id, organizationId, cancellationToken);
 
                 if (existingMembership != null)
                 {
@@ -77,7 +78,7 @@ public class InvitationService
             }
 
             // Get the inviting user's information
-            var invitingUser = await _userRepository.GetByIdAsync(invitedByUserId);
+            var invitingUser = await _userRepository.GetByIdAsync(invitedByUserId, cancellationToken);
             if (invitingUser == null)
             {
                 return ServiceResult<InviteUserResponse>.Failure("Inviting user not found", ErrorCode.NotFound);
@@ -104,7 +105,7 @@ public class InvitationService
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                await _userRepository.AddAsync(user);
+                await _userRepository.AddAsync(user, cancellationToken);
             }
             else
             {
@@ -124,7 +125,7 @@ public class InvitationService
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await _userOrganizationRepository.AddAsync(userOrganization);
+            await _userOrganizationRepository.AddAsync(userOrganization, cancellationToken);
 
             // TODO: Send invitation email
             // await _emailService.SendInvitationEmailAsync(user.Email, invitationToken, organizationId);
@@ -151,7 +152,7 @@ public class InvitationService
     /// <summary>
     /// Accept an invitation to join an organization
     /// </summary>
-    public async Task<ServiceResult<AcceptInvitationResponse>> AcceptInvitationAsync(AcceptInvitationRequest request)
+    public async Task<ServiceResult<AcceptInvitationResponse>> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -177,7 +178,7 @@ public class InvitationService
             }
 
             // Find the invitation
-            var userOrganization = await _userOrganizationRepository.GetByInvitationTokenAsync(request.InvitationToken);
+            var userOrganization = await _userOrganizationRepository.GetByInvitationTokenAsync(request.InvitationToken, cancellationToken);
             if (userOrganization == null)
             {
                 return ServiceResult<AcceptInvitationResponse>.Failure("Invalid invitation token", ErrorCode.NotFound);
@@ -196,7 +197,7 @@ public class InvitationService
             }
 
             // Get the user
-            var user = userOrganization.User ?? await _userRepository.GetByIdAsync(userOrganization.UserId);
+            var user = userOrganization.User ?? await _userRepository.GetByIdAsync(userOrganization.UserId, cancellationToken);
             if (user == null)
             {
                 return ServiceResult<AcceptInvitationResponse>.Failure("User not found", ErrorCode.NotFound);
@@ -210,12 +211,12 @@ public class InvitationService
             user.MarkEmailAsVerified();
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
 
             // Activate the membership
             userOrganization.AcceptInvitation();
 
-            await _userOrganizationRepository.UpdateAsync(userOrganization);
+            await _userOrganizationRepository.UpdateAsync(userOrganization, cancellationToken);
 
             _logger.LogInformation("User {UserId} accepted invitation to organization {OrganizationId}",
                 user.Id, userOrganization.OrganizationId);

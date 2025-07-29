@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Application.DTOs;
+using SermonTranscription.Application.Interfaces;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 
@@ -37,7 +38,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var result = await _authService.LoginAsync(request.Email, request.Password);
+        var result = await _authService.LoginAsync(request.Email, request.Password, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -54,7 +55,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var result = await _authService.RegisterAsync(request);
+        var result = await _authService.RegisterAsync(request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => StatusCode(201, SuccessResponse(result.Data, "Registration successful")));
     }
 
@@ -71,7 +72,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+        var result = await _authService.RefreshTokenAsync(request.RefreshToken, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -89,7 +90,7 @@ public class AuthController : BaseApiController
     {
 
         var userId = HttpContext.GetUserId()!.Value;
-        var result = await _authService.RevokeAllUserRefreshTokensAsync(userId);
+        var result = await _authService.RevokeAllUserRefreshTokensAsync(userId, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -105,7 +106,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
-        var result = await _authService.ForgotPasswordAsync(request.Email);
+        var result = await _authService.ForgotPasswordAsync(request.Email, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -122,7 +123,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
-        var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
+        var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -144,7 +145,7 @@ public class AuthController : BaseApiController
         var tenantContext = HttpContext.GetTenantContext()!;
         var invitedByUserId = HttpContext.GetUserId()!.Value;
 
-        var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, invitedByUserId);
+        var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, invitedByUserId, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -161,7 +162,7 @@ public class AuthController : BaseApiController
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
     {
-        var result = await _invitationService.AcceptInvitationAsync(request);
+        var result = await _invitationService.AcceptInvitationAsync(request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 
@@ -179,7 +180,7 @@ public class AuthController : BaseApiController
     public async Task<IActionResult> GetUserOrganizations()
     {
         var userId = HttpContext.GetUserId()!.Value;
-        var result = await _authService.GetUserOrganizationsAsync(userId);
+        var result = await _authService.GetUserOrganizationsAsync(userId, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => Ok(result.Data));
     }
 }
