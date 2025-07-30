@@ -28,16 +28,14 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Created organization details</returns>
     [HttpPost]
     [OrganizationAgnostic]
-    [ProducesResponseType(typeof(ApiResponse<OrganizationResponse>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ValidationErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateOrganization([FromBody] CreateOrganizationRequest request)
     {
         var userId = GetCurrentUserId();
-
         var result = await _organizationService.CreateOrganizationAsync(request, userId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () =>
-            StatusCode(201, SuccessResponse(result.Data!, "Organization created successfully")));
+        return HandleServiceResult(result, () => CreatedResponse(result.Data!, "Organization created successfully"));
     }
 
     /// <summary>
@@ -45,15 +43,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>Organization details</returns>
     [HttpGet("load")]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> LoadOrganization()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.GetOrganizationAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization retrieved successfully"));
     }
 
     /// <summary>
@@ -63,16 +61,16 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Updated organization details</returns>
     [HttpPut]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganization([FromBody] UpdateOrganizationRequest request)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.UpdateOrganizationAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization updated successfully"));
     }
 
     /// <summary>
@@ -82,16 +80,16 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Updated organization details</returns>
     [HttpPut("settings")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganizationSettings([FromBody] UpdateOrganizationSettingsRequest request)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.UpdateOrganizationSettingsAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization settings updated successfully"));
     }
 
     /// <summary>
@@ -101,16 +99,16 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Updated organization details</returns>
     [HttpPut("logo")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateOrganizationLogo([FromBody] UpdateOrganizationLogoRequest request)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.UpdateOrganizationLogoAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization logo updated successfully"));
     }
 
     /// <summary>
@@ -119,11 +117,11 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Activation confirmation</returns>
     [HttpPost("activate")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ActivateOrganization()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
@@ -137,11 +135,11 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Deactivation confirmation</returns>
     [HttpPost("deactivate")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateOrganization()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
@@ -155,15 +153,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Organization details with user list</returns>
     [HttpGet("users")]
     [RequireCanManageUsers]
-    [ProducesResponseType(typeof(OrganizationWithUsersResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationWithUsersResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationWithUsers()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.GetOrganizationWithUsersAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization with users retrieved successfully"));
     }
 
     /// <summary>
@@ -172,15 +170,15 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// <returns>Organization details with subscription list</returns>
     [HttpGet("subscriptions")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(OrganizationWithSubscriptionsResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationWithSubscriptionsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationWithSubscriptions()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.GetOrganizationWithSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization with subscriptions retrieved successfully"));
     }
 
     /// <summary>
@@ -188,14 +186,14 @@ public class OrganizationsController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>Organization dashboard information</returns>
     [HttpGet("dashboard")]
-    [ProducesResponseType(typeof(OrganizationDashboardResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<OrganizationDashboardResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganizationDashboard()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _organizationService.GetOrganizationDashboardAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Organization dashboard retrieved successfully"));
     }
 }

@@ -1,4 +1,5 @@
 using SermonTranscription.Domain.Enums;
+using System.Text.Json.Serialization;
 
 namespace SermonTranscription.Application.DTOs;
 
@@ -7,5 +8,6 @@ namespace SermonTranscription.Application.DTOs;
 /// </summary>
 public class CreateSubscriptionRequest
 {
+    [JsonConverter(typeof(JsonStringEnumConverter<SubscriptionPlan>))]
     public SubscriptionPlan Plan { get; set; }
 }

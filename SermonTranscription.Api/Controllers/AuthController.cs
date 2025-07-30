@@ -32,14 +32,14 @@ public class AuthController : BaseApiController
     /// <returns>Authentication tokens and user information</returns>
     [HttpPost("login")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var result = await _authService.LoginAsync(request.Email, request.Password, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Login successful"));
     }
 
     /// <summary>
@@ -49,14 +49,14 @@ public class AuthController : BaseApiController
     /// <returns>Registration result</returns>
     [HttpPost("register")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<RegisterResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await _authService.RegisterAsync(request, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => StatusCode(201, SuccessResponse(result.Data, "Registration successful")));
+        return HandleServiceResult(result, () => CreatedResponse(result.Data, "Registration successful"));
     }
 
     /// <summary>
@@ -66,14 +66,14 @@ public class AuthController : BaseApiController
     /// <returns>New access and refresh tokens</returns>
     [HttpPost("refresh")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(RefreshResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<RefreshResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
         var result = await _authService.RefreshTokenAsync(request.RefreshToken, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Token refreshed successfully"));
     }
 
     /// <summary>
@@ -83,15 +83,14 @@ public class AuthController : BaseApiController
     [HttpPost("logout")]
     [Authorize]
     [OrganizationAgnostic]
-    [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<LogoutResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Logout()
     {
-
         var userId = HttpContext.GetUserId()!.Value;
         var result = await _authService.RevokeAllUserRefreshTokensAsync(userId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Logout successful"));
     }
 
     /// <summary>
@@ -101,13 +100,13 @@ public class AuthController : BaseApiController
     /// <returns>Password reset confirmation</returns>
     [HttpPost("forgot-password")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<ForgotPasswordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         var result = await _authService.ForgotPasswordAsync(request.Email, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Password reset request processed successfully"));
     }
 
     /// <summary>
@@ -117,14 +116,14 @@ public class AuthController : BaseApiController
     /// <returns>Password reset confirmation</returns>
     [HttpPost("reset-password")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<ResetPasswordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Password reset successfully"));
     }
 
     /// <summary>
@@ -135,18 +134,17 @@ public class AuthController : BaseApiController
     [HttpPost("invite")]
     [Authorize]
     [RequireCanManageUsers]
-    [ProducesResponseType(typeof(InviteUserResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<InviteUserResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var invitedByUserId = HttpContext.GetUserId()!.Value;
-
         var result = await _invitationService.InviteUserAsync(request, tenantContext.OrganizationId, invitedByUserId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "User invitation sent successfully"));
     }
 
     /// <summary>
@@ -156,14 +154,14 @@ public class AuthController : BaseApiController
     /// <returns>Acceptance result</returns>
     [HttpPost("accept-invitation")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(AcceptInvitationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<AcceptInvitationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
     {
         var result = await _invitationService.AcceptInvitationAsync(request, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Invitation accepted successfully"));
     }
 
     /// <summary>
@@ -173,14 +171,14 @@ public class AuthController : BaseApiController
     [HttpGet("organizations")]
     [Authorize]
     [OrganizationAgnostic]
-    [ProducesResponseType(typeof(List<OrganizationSummaryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<List<OrganizationSummaryDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetUserOrganizations()
     {
         var userId = HttpContext.GetUserId()!.Value;
         var result = await _authService.GetUserOrganizationsAsync(userId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "User organizations retrieved successfully"));
     }
 }

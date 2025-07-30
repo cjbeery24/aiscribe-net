@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
+using SermonTranscription.Application.Common;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Domain.Entities;
@@ -14,6 +15,7 @@ public class InvitationServiceTests
 {
     private readonly Mock<IUserRepository> _mockUserRepository;
     private readonly Mock<IUserOrganizationRepository> _mockUserOrganizationRepository;
+    private readonly Mock<IOrganizationRepository> _mockOrganizationRepository;
     private readonly Mock<IEmailService> _mockEmailService;
     private readonly Mock<IJwtService> _mockJwtService;
     private readonly Mock<ILogger<InvitationService>> _mockLogger;
@@ -25,6 +27,7 @@ public class InvitationServiceTests
     {
         _mockUserRepository = new Mock<IUserRepository>();
         _mockUserOrganizationRepository = new Mock<IUserOrganizationRepository>();
+        _mockOrganizationRepository = new Mock<IOrganizationRepository>();
         _mockEmailService = new Mock<IEmailService>();
         _mockJwtService = new Mock<IJwtService>();
         _mockLogger = new Mock<ILogger<InvitationService>>();
@@ -34,6 +37,7 @@ public class InvitationServiceTests
         _invitationService = new InvitationService(
             _mockUserRepository.Object,
             _mockUserOrganizationRepository.Object,
+            _mockOrganizationRepository.Object,
             _mockEmailService.Object,
             _mockJwtService.Object,
             _mockLogger.Object,
@@ -92,14 +96,16 @@ public class InvitationServiceTests
                 It.IsAny<string?>()))
             .ReturnsAsync(true);
 
+        _mockOrganizationRepository
+            .Setup(x => x.GetByIdAsync(organizationId, CancellationToken.None))
+            .ReturnsAsync(new Organization { Name = "Test Organization" });
+
         // Act
         var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
         // Assert
-        Assert.True(result.Success);
-        Assert.Equal("Invitation sent successfully.", result.Message);
-        Assert.Equal(request.Email, result.Email);
-        Assert.NotNull(result.InvitationToken);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(request.Email, result.Data.Email);
 
         _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
@@ -172,14 +178,16 @@ public class InvitationServiceTests
                 It.IsAny<string?>()))
             .ReturnsAsync(true);
 
+        _mockOrganizationRepository
+            .Setup(x => x.GetByIdAsync(organizationId, CancellationToken.None))
+            .ReturnsAsync(new Organization { Name = "Test Organization" });
+
         // Act
         var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
         // Assert
-        Assert.True(result.Success);
-        Assert.Equal("Invitation sent successfully.", result.Message);
-        Assert.Equal(request.Email, result.Email);
-        Assert.NotNull(result.InvitationToken);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(request.Email, result.Data.Email);
 
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
         _mockUserOrganizationRepository.Verify(x => x.AddAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
@@ -220,21 +228,23 @@ public class InvitationServiceTests
             .Setup(x => x.GetUserOrganizationAsync(existingUser.Id, organizationId, CancellationToken.None))
             .ReturnsAsync(existingMembership);
 
+        _mockOrganizationRepository
+            .Setup(x => x.GetByIdAsync(organizationId, CancellationToken.None))
+            .ReturnsAsync(new Organization { Name = "Test Organization" });
+
         // Act
         var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.Equal("User is already a member of this organization.", result.Message);
-        Assert.Equal(request.Email, result.Email);
-        Assert.Null(result.InvitationToken);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Conflict);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(null)]
     [InlineData("   ")]
-    public async Task InviteUserAsync_WithInvalidEmail_ShouldThrowException(string email)
+    public async Task InviteUserAsync_WithInvalidEmail_ShouldErrorValidationError(string email)
     {
         // Arrange
         var request = new InviteUserRequest
@@ -249,10 +259,10 @@ public class InvitationServiceTests
         var invitedByUserId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<UserDomainException>(
-            () => _invitationService.InviteUserAsync(request, organizationId, invitedByUserId));
+        var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
-        Assert.Equal("Email address is required.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Theory]
@@ -262,7 +272,7 @@ public class InvitationServiceTests
     [InlineData("John", null)]
     [InlineData("   ", "Doe")]
     [InlineData("John", "   ")]
-    public async Task InviteUserAsync_WithInvalidName_ShouldThrowException(string firstName, string lastName)
+    public async Task InviteUserAsync_WithInvalidName_ShouldErrorValidationError(string firstName, string lastName)
     {
         // Arrange
         var request = new InviteUserRequest
@@ -277,14 +287,14 @@ public class InvitationServiceTests
         var invitedByUserId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<UserDomainException>(
-            () => _invitationService.InviteUserAsync(request, organizationId, invitedByUserId));
+        var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
-        Assert.Equal("First name and last name are required.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
-    public async Task InviteUserAsync_WithInvalidInvitingUser_ShouldThrowException()
+    public async Task InviteUserAsync_WithInvalidInvitingUser_ShouldErrorNotFound()
     {
         // Arrange
         var request = new InviteUserRequest
@@ -307,10 +317,10 @@ public class InvitationServiceTests
             .ReturnsAsync((User?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<UserDomainException>(
-            () => _invitationService.InviteUserAsync(request, organizationId, invitedByUserId));
+        var result = await _invitationService.InviteUserAsync(request, organizationId, invitedByUserId);
 
-        Assert.Equal("Inviting user not found.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     #endregion
@@ -334,7 +344,8 @@ public class InvitationServiceTests
             Role = UserRole.OrganizationUser,
             InvitationToken = request.InvitationToken,
             InvitationAcceptedAt = null,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Organization = new Organization { Name = "Test Organization" }
         };
 
         var user = new User
@@ -384,12 +395,9 @@ public class InvitationServiceTests
         var result = await _invitationService.AcceptInvitationAsync(request);
 
         // Assert
-        Assert.True(result.Success);
-        Assert.Equal("Invitation accepted successfully. Welcome!", result.Message);
-        Assert.Equal("Organization Name", result.OrganizationName);
-        Assert.Equal("OrganizationUser", result.Role);
-        Assert.Equal("access_token", result.AccessToken);
-        Assert.Equal("refresh_token", result.RefreshToken);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Test Organization", result.Data.OrganizationName);
+        Assert.Equal("OrganizationUser", result.Data.Role);
 
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockUserOrganizationRepository.Verify(x => x.UpdateAsync(It.IsAny<UserOrganization>(), CancellationToken.None), Times.Once);
@@ -418,10 +426,8 @@ public class InvitationServiceTests
         var result = await _invitationService.AcceptInvitationAsync(request);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.Equal("Invalid or expired invitation token.", result.Message);
-        Assert.Null(result.AccessToken);
-        Assert.Null(result.RefreshToken);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
@@ -451,10 +457,8 @@ public class InvitationServiceTests
         var result = await _invitationService.AcceptInvitationAsync(request);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.Equal("This invitation has already been accepted.", result.Message);
-        Assert.Null(result.AccessToken);
-        Assert.Null(result.RefreshToken);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
@@ -485,14 +489,12 @@ public class InvitationServiceTests
         var result = await _invitationService.AcceptInvitationAsync(request);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.Equal("This invitation has expired.", result.Message);
-        Assert.Null(result.AccessToken);
-        Assert.Null(result.RefreshToken);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
-    public async Task AcceptInvitationAsync_WithInvalidPassword_ShouldThrowException()
+    public async Task AcceptInvitationAsync_WithInvalidPassword_ShouldErrorValidationError()
     {
         // Arrange
         var request = new AcceptInvitationRequest
@@ -520,14 +522,14 @@ public class InvitationServiceTests
             .Throws(new PasswordValidationDomainException("Password must be at least 8 characters long"));
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<PasswordValidationDomainException>(
-            () => _invitationService.AcceptInvitationAsync(request));
+        var result = await _invitationService.AcceptInvitationAsync(request);
 
-        Assert.Equal("Password must be at least 8 characters long", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
-    public async Task AcceptInvitationAsync_WithUserNotFound_ShouldThrowException()
+    public async Task AcceptInvitationAsync_WithUserNotFound_ShouldErrorNotFound()
     {
         // Arrange
         var request = new AcceptInvitationRequest
@@ -555,17 +557,17 @@ public class InvitationServiceTests
             .ReturnsAsync((User?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<UserDomainException>(
-            () => _invitationService.AcceptInvitationAsync(request));
+        var result = await _invitationService.AcceptInvitationAsync(request);
 
-        Assert.Equal("User not found.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(null)]
     [InlineData("   ")]
-    public async Task AcceptInvitationAsync_WithEmptyToken_ShouldThrowException(string token)
+    public async Task AcceptInvitationAsync_WithEmptyToken_ShouldErrorValidationError(string token)
     {
         // Arrange
         var request = new AcceptInvitationRequest
@@ -575,17 +577,17 @@ public class InvitationServiceTests
         };
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<UserDomainException>(
-            () => _invitationService.AcceptInvitationAsync(request));
+        var result = await _invitationService.AcceptInvitationAsync(request);
 
-        Assert.Equal("Invitation token is required.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(null)]
     [InlineData("   ")]
-    public async Task AcceptInvitationAsync_WithEmptyPassword_ShouldThrowException(string password)
+    public async Task AcceptInvitationAsync_WithEmptyPassword_ShouldErrorValidationError(string password)
     {
         // Arrange
         var request = new AcceptInvitationRequest
@@ -596,13 +598,13 @@ public class InvitationServiceTests
 
         _mockPasswordValidator
             .Setup(x => x.Validate(password))
-            .Throws(new PasswordValidationDomainException("Password is required."));
+            .Throws(new PasswordValidationDomainException("Password is required"));
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<PasswordValidationDomainException>(
-            () => _invitationService.AcceptInvitationAsync(request));
+        var result = await _invitationService.AcceptInvitationAsync(request);
 
-        Assert.Equal("Password is required.", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     #endregion

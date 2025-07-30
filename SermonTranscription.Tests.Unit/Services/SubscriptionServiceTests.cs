@@ -1,11 +1,11 @@
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Moq;
+using SermonTranscription.Application.Common;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
-using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Tests.Unit.Common;
 using Xunit;
@@ -66,10 +66,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(subscription.Id, result.Id);
-        Assert.Equal(subscription.OrganizationId, result.OrganizationId);
-        Assert.Equal(subscription.Plan, result.Plan);
-        Assert.Equal(subscription.Status, result.Status);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Data);
+        Assert.Equal(subscription.Id, result.Data.Id);
+        Assert.Equal(subscription.OrganizationId, result.Data.OrganizationId);
+        Assert.Equal(subscription.Plan, result.Data.Plan);
+        Assert.Equal(subscription.Status, result.Data.Status);
     }
 
     [Fact]
@@ -86,7 +88,9 @@ public class SubscriptionServiceTests : BaseUnitTest
         var result = await _subscriptionService.GetCurrentSubscriptionAsync(organizationId);
 
         // Assert
-        Assert.Null(result);
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Data);
     }
 
     #endregion
@@ -125,7 +129,9 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(3, result.Count());
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Data);
+        Assert.Equal(3, result.Data.Count());
     }
 
     [Fact]
@@ -147,7 +153,9 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Data);
+        Assert.Empty(result.Data);
     }
 
     #endregion
@@ -204,17 +212,17 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(expectedSubscription.Id, result.Id);
-        Assert.Equal(expectedSubscription.OrganizationId, result.OrganizationId);
-        Assert.Equal(expectedSubscription.Plan, result.Plan);
-        Assert.Equal(expectedSubscription.Status, result.Status);
+        Assert.Equal(expectedSubscription.Id, result.Data.Id);
+        Assert.Equal(expectedSubscription.OrganizationId, result.Data.OrganizationId);
+        Assert.Equal(expectedSubscription.Plan, result.Data.Plan);
+        Assert.Equal(expectedSubscription.Status, result.Data.Status);
 
         _mockSubscriptionRepository.Verify(x => x.AddAsync(It.IsAny<Subscription>(), CancellationToken.None), Times.Once);
         _mockSubscriptionRepository.Verify(x => x.SaveChangesAsync(CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task CreateSubscriptionAsync_WithNonExistentOrganization_ShouldThrowException()
+    public async Task CreateSubscriptionAsync_WithNonExistentOrganization_ShouldErrorNotFound()
     {
         // Arrange
         var organizationId = Guid.NewGuid();
@@ -225,14 +233,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Organization?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<OrganizationDomainException>(
-            () => _subscriptionService.CreateSubscriptionAsync(organizationId, plan));
+        var result = await _subscriptionService.CreateSubscriptionAsync(organizationId, plan);
 
-        Assert.Equal($"Organization with ID {organizationId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
-    public async Task CreateSubscriptionAsync_WithExistingActiveSubscription_ShouldThrowException()
+    public async Task CreateSubscriptionAsync_WithExistingActiveSubscription_ShouldErrorConflict()
     {
         // Arrange
         var organizationId = Guid.NewGuid();
@@ -253,10 +261,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(existingSubscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<OrganizationDomainException>(
-            () => _subscriptionService.CreateSubscriptionAsync(organizationId, plan));
+        var result = await _subscriptionService.CreateSubscriptionAsync(organizationId, plan);
 
-        Assert.Equal("Organization already has an active subscription", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Conflict);
     }
 
     #endregion
@@ -294,12 +302,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(newPlan, result.Plan);
+        Assert.Equal(newPlan, result.Data.Plan);
         _mockSubscriptionRepository.Verify(x => x.UpdateAsync(subscription, CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task ChangeSubscriptionPlanAsync_WithNonExistentSubscription_ShouldThrowException()
+    public async Task ChangeSubscriptionPlanAsync_WithNonExistentSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -310,14 +318,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, newPlan));
+        var result = await _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, newPlan);
 
-        Assert.Equal($"Subscription with ID {subscriptionId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
-    public async Task ChangeSubscriptionPlanAsync_WithInactiveSubscription_ShouldThrowException()
+    public async Task ChangeSubscriptionPlanAsync_WithInactiveSubscription_ShouldErrorForbidden()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -331,10 +339,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(subscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, newPlan));
+        var result = await _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, newPlan);
 
-        Assert.Equal("Cannot change plan for inactive subscription", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Forbidden);
     }
 
     [Fact]
@@ -368,7 +376,7 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(plan, result.Plan);
+        Assert.Equal(plan, result.Data.Plan);
         _mockSubscriptionRepository.Verify(x => x.UpdateAsync(It.IsAny<Subscription>(), CancellationToken.None), Times.Never);
     }
 
@@ -404,12 +412,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(SubscriptionStatus.Cancelled, result.Status);
+        Assert.Equal(SubscriptionStatus.Cancelled, result.Data.Status);
         _mockSubscriptionRepository.Verify(x => x.UpdateAsync(subscription, CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task CancelSubscriptionAsync_WithNonExistentSubscription_ShouldThrowException()
+    public async Task CancelSubscriptionAsync_WithNonExistentSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -419,14 +427,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.CancelSubscriptionAsync(subscriptionId));
+        var result = await _subscriptionService.CancelSubscriptionAsync(subscriptionId);
 
-        Assert.Equal($"Subscription with ID {subscriptionId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
-    public async Task CancelSubscriptionAsync_WithAlreadyCancelledSubscription_ShouldThrowException()
+    public async Task CancelSubscriptionAsync_WithAlreadyCancelledSubscription_ShouldErrorConflict()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -439,10 +447,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(subscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.CancelSubscriptionAsync(subscriptionId));
+        var result = await _subscriptionService.CancelSubscriptionAsync(subscriptionId);
 
-        Assert.Equal("Subscription is already cancelled", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Conflict);
     }
 
     #endregion
@@ -477,12 +485,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(SubscriptionStatus.Active, result.Status);
+        Assert.Equal(SubscriptionStatus.Active, result.Data.Status);
         _mockSubscriptionRepository.Verify(x => x.UpdateAsync(subscription, CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task ReactivateSubscriptionAsync_WithNonExistentSubscription_ShouldThrowException()
+    public async Task ReactivateSubscriptionAsync_WithNonExistentSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -492,14 +500,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.ReactivateSubscriptionAsync(subscriptionId));
+        var result = await _subscriptionService.ReactivateSubscriptionAsync(subscriptionId);
 
-        Assert.Equal($"Subscription with ID {subscriptionId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
-    public async Task ReactivateSubscriptionAsync_WithActiveSubscription_ShouldThrowException()
+    public async Task ReactivateSubscriptionAsync_WithActiveSubscription_ShouldErrorConflict()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -512,10 +520,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(subscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.ReactivateSubscriptionAsync(subscriptionId));
+        var result = await _subscriptionService.ReactivateSubscriptionAsync(subscriptionId);
 
-        Assert.Equal("Subscription is already active", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Conflict);
     }
 
     #endregion
@@ -555,12 +563,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(minutesUsed, result.TranscriptionMinutesUsed);
+        Assert.Equal(minutesUsed, result.Data.TranscriptionMinutesUsed);
         _mockSubscriptionRepository.Verify(x => x.SaveChangesAsync(CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task TrackTranscriptionUsageAsync_WithNonExistentSubscription_ShouldThrowException()
+    public async Task TrackTranscriptionUsageAsync_WithNonExistentSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -571,14 +579,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed));
+        var result = await _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed);
 
-        Assert.Equal($"Subscription with ID {subscriptionId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
-    public async Task TrackTranscriptionUsageAsync_WithInactiveSubscription_ShouldThrowException()
+    public async Task TrackTranscriptionUsageAsync_WithInactiveSubscription_ShouldErrorForbidden()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -592,14 +600,14 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(subscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed));
+        var result = await _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed);
 
-        Assert.Equal("Cannot track usage for inactive subscription", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Forbidden);
     }
 
     [Fact]
-    public async Task TrackTranscriptionUsageAsync_WithInsufficientMinutes_ShouldThrowException()
+    public async Task TrackTranscriptionUsageAsync_WithInsufficientMinutes_ShouldErrorValidationError()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -616,10 +624,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync(subscription);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed));
+        var result = await _subscriptionService.TrackTranscriptionUsageAsync(subscriptionId, minutesUsed);
 
-        Assert.Equal($"Insufficient transcription minutes remaining. Requested: {minutesUsed}, Available: {subscription.MaxTranscriptionMinutes}", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     #endregion
@@ -654,12 +662,12 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(0, result.TranscriptionMinutesUsed);
+        Assert.Equal(0, result.Data.TranscriptionMinutesUsed);
         _mockSubscriptionRepository.Verify(x => x.SaveChangesAsync(CancellationToken.None), Times.Once);
     }
 
     [Fact]
-    public async Task ResetMonthlyUsageAsync_WithNonExistentSubscription_ShouldThrowException()
+    public async Task ResetMonthlyUsageAsync_WithNonExistentSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
@@ -669,10 +677,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.ResetMonthlyUsageAsync(subscriptionId));
+        var result = await _subscriptionService.ResetMonthlyUsageAsync(subscriptionId);
 
-        Assert.Equal($"Subscription with ID {subscriptionId} not found", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     #endregion
@@ -700,7 +708,7 @@ public class SubscriptionServiceTests : BaseUnitTest
         var result = await _subscriptionService.CanUseTranscriptionMinutesAsync(organizationId, minutes);
 
         // Assert
-        Assert.True(result);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -724,7 +732,8 @@ public class SubscriptionServiceTests : BaseUnitTest
         var result = await _subscriptionService.CanUseTranscriptionMinutesAsync(organizationId, minutes);
 
         // Assert
-        Assert.False(result);
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Data);
     }
 
     [Fact]
@@ -742,7 +751,7 @@ public class SubscriptionServiceTests : BaseUnitTest
         var result = await _subscriptionService.CanUseTranscriptionMinutesAsync(organizationId, minutes);
 
         // Assert
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
     }
 
     #endregion
@@ -762,35 +771,29 @@ public class SubscriptionServiceTests : BaseUnitTest
         subscription.MaxTranscriptionMinutes = 600;
         subscription.UsageResetDate = DateTime.UtcNow.AddDays(15);
 
-        var totalUsage = 1200;
-
         _mockSubscriptionRepository
             .Setup(x => x.GetActiveByOrganizationAsync(organizationId, CancellationToken.None))
             .ReturnsAsync(subscription);
-
-        _mockSubscriptionRepository
-            .Setup(x => x.GetTotalUsageMinutesAsync(organizationId, null, CancellationToken.None))
-            .ReturnsAsync(totalUsage);
 
         // Act
         var result = await _subscriptionService.GetUsageAnalyticsAsync(organizationId);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(organizationId, result.OrganizationId);
-        Assert.Equal(subscription.Plan, result.CurrentPlan);
-        Assert.Equal(subscription.Plan.ToString(), result.PlanName);
-        Assert.Equal(subscription.MaxTranscriptionMinutes, result.MonthlyLimit);
-        Assert.Equal(subscription.TranscriptionMinutesUsed, result.MinutesUsed);
-        Assert.Equal(subscription.RemainingTranscriptionMinutes, result.MinutesRemaining);
-        Assert.Equal(totalUsage, result.TotalUsage);
-        Assert.Equal(50, result.UsagePercentage); // 300/600 * 100
-        Assert.Equal(subscription.UsageResetDate, result.UsageResetDate);
-        Assert.False(result.IsNearLimit); // 300 remaining > 120
+        Assert.Equal(organizationId, result.Data.OrganizationId);
+        Assert.Equal(subscription.Plan, result.Data.CurrentPlan);
+        Assert.Equal(subscription.Plan.ToString(), result.Data.PlanName);
+        Assert.Equal(subscription.MaxTranscriptionMinutes, result.Data.MonthlyLimit);
+        Assert.Equal(subscription.TranscriptionMinutesUsed, result.Data.MinutesUsed);
+        Assert.Equal(subscription.RemainingTranscriptionMinutes, result.Data.MinutesRemaining);
+        Assert.Equal(subscription.TranscriptionMinutesUsed, result.Data.TotalUsage);
+        Assert.Equal(50, result.Data.UsagePercentage); // 300/600 * 100
+        Assert.Equal(subscription.UsageResetDate, result.Data.UsageResetDate);
+        Assert.False(result.Data.IsNearLimit); // 300 remaining > 120
     }
 
     [Fact]
-    public async Task GetUsageAnalyticsAsync_WithNoActiveSubscription_ShouldThrowException()
+    public async Task GetUsageAnalyticsAsync_WithNoActiveSubscription_ShouldErrorNotFound()
     {
         // Arrange
         var organizationId = Guid.NewGuid();
@@ -800,10 +803,10 @@ public class SubscriptionServiceTests : BaseUnitTest
             .ReturnsAsync((Subscription?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<SubscriptionDomainException>(
-            () => _subscriptionService.GetUsageAnalyticsAsync(organizationId));
+        var result = await _subscriptionService.GetUsageAnalyticsAsync(organizationId);
 
-        Assert.Equal($"No active subscription found for organization {organizationId}", exception.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.NotFound);
     }
 
     [Fact]
@@ -822,15 +825,11 @@ public class SubscriptionServiceTests : BaseUnitTest
             .Setup(x => x.GetActiveByOrganizationAsync(organizationId, CancellationToken.None))
             .ReturnsAsync(subscription);
 
-        _mockSubscriptionRepository
-            .Setup(x => x.GetTotalUsageMinutesAsync(organizationId, null, CancellationToken.None))
-            .ReturnsAsync(1000);
-
         // Act
         var result = await _subscriptionService.GetUsageAnalyticsAsync(organizationId);
 
         // Assert
-        Assert.True(result.IsNearLimit); // 20 remaining <= 120
+        Assert.True(result.Data.IsNearLimit); // 20 remaining <= 120
     }
 
     #endregion
@@ -845,27 +844,27 @@ public class SubscriptionServiceTests : BaseUnitTest
 
         // Assert
         Assert.NotNull(result);
-        var plans = result.ToList();
+        var plans = result.Data.ToList();
         Assert.Equal(3, plans.Count); // Basic, Professional, Enterprise
 
         var basicPlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Basic);
         Assert.NotNull(basicPlan);
         Assert.Equal("Basic", basicPlan.PlanName);
-        Assert.Equal(360, basicPlan.MaxTranscriptionMinutes); // 6 hours
+        Assert.Equal(300, basicPlan.MaxTranscriptionMinutes); // 5 hours
         Assert.True(basicPlan.CanExportTranscriptions);
-        Assert.True(basicPlan.HasRealtimeTranscription);
+        Assert.False(basicPlan.HasRealtimeTranscription);
         Assert.False(basicPlan.HasPrioritySupport);
 
         var professionalPlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Professional);
         Assert.NotNull(professionalPlan);
         Assert.Equal("Professional", professionalPlan.PlanName);
-        Assert.Equal(600, professionalPlan.MaxTranscriptionMinutes); // 10 hours
+        Assert.Equal(1000, professionalPlan.MaxTranscriptionMinutes); // 1000 minutes
         Assert.True(professionalPlan.HasPrioritySupport);
 
         var enterprisePlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Enterprise);
         Assert.NotNull(enterprisePlan);
         Assert.Equal("Enterprise", enterprisePlan.PlanName);
-        Assert.Equal(840, enterprisePlan.MaxTranscriptionMinutes); // 14 hours
+        Assert.Equal(5000, enterprisePlan.MaxTranscriptionMinutes); // 5000 minutes
         Assert.True(enterprisePlan.HasPrioritySupport);
     }
 
@@ -876,25 +875,24 @@ public class SubscriptionServiceTests : BaseUnitTest
         var result = await _subscriptionService.GetAvailablePlansAsync();
 
         // Assert
-        var plans = result.ToList();
+        var plans = result.Data.ToList();
 
         var basicPlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Basic);
         Assert.NotNull(basicPlan);
-        Assert.Contains("Unlimited users", basicPlan.Features);
-        Assert.Contains("6 hours of transcription per month", basicPlan.Features);
-        Assert.Contains("Real-time transcription", basicPlan.Features);
-        Assert.Contains("Export transcriptions", basicPlan.Features);
+        Assert.Contains("300 minutes of transcription per month", basicPlan.Features);
+        Assert.Contains("Improved transcription accuracy", basicPlan.Features);
         Assert.Contains("Email support", basicPlan.Features);
+        Assert.Contains("Export to common formats", basicPlan.Features);
 
         var professionalPlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Professional);
         Assert.NotNull(professionalPlan);
         Assert.Contains("Priority support", professionalPlan.Features);
-        Assert.Contains("Advanced analytics", professionalPlan.Features);
+        Assert.Contains("Analytics dashboard", professionalPlan.Features);
 
         var enterprisePlan = plans.FirstOrDefault(p => p.Plan == SubscriptionPlan.Enterprise);
         Assert.NotNull(enterprisePlan);
         Assert.Contains("Custom integrations", enterprisePlan.Features);
-        Assert.Contains("Dedicated account manager", enterprisePlan.Features);
+        Assert.Contains("Dedicated support", enterprisePlan.Features);
     }
 
     #endregion

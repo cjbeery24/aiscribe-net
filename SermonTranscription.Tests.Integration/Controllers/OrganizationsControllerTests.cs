@@ -331,7 +331,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Contain("activated");
 
@@ -356,7 +356,7 @@ public class OrganizationsControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Contain("deactivated");
 

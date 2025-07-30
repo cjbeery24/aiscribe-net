@@ -21,7 +21,7 @@ public abstract class BaseApiController : ControllerBase
     #region Protected Helper Methods
 
     /// <summary>
-    /// Handles service results with data and returns appropriate HTTP responses using ApiResponse wrapper
+    /// Handles service results with data and returns appropriate HTTP responses using ApiSuccessResponse or ApiErrorResponse
     /// </summary>
     /// <typeparam name="T">Type of data in the service result</typeparam>
     /// <param name="result">Service result to handle</param>
@@ -29,125 +29,118 @@ public abstract class BaseApiController : ControllerBase
     /// <returns>Appropriate HTTP response</returns>
     protected IActionResult HandleServiceResult<T>(ServiceResult<T> result, Func<IActionResult> successAction)
     {
-        if (!result.IsSuccess)
+        if (result.IsSuccess)
         {
-            // Map ServiceError to ValidationError for validation-specific errors
-            var validationErrors = result.Errors
-                .Where(e => !string.IsNullOrEmpty(e.Field))
-                .Select(e => new ValidationError
-                {
-                    Field = e.Field!,
-                    Message = e.Message,
-                    ErrorCode = e.ErrorCode.ToString(),
-                    AttemptedValue = e.AttemptedValue
-                })
-                .ToArray();
-
-            if (validationErrors.Any())
-            {
-                var validationErrorResponse = new ValidationErrorResponse
-                {
-                    Message = result.Message,
-                    Errors = validationErrors.Select(e => e.Message).ToArray(),
-                    ValidationErrors = validationErrors,
-                    TraceId = HttpContext.TraceIdentifier
-                };
-                return BadRequest(validationErrorResponse);
-            }
-
-            var errorResponse = ApiResponse<T>.ErrorResponse(result.Message, result.Errors.Select(e => e.Message).ToArray());
-
-            // Map based on error codes or message content
-            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
-            switch (errorCode)
-            {
-                case ErrorCode.NotFound:
-                case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
-                    return NotFound(errorResponse);
-
-                case ErrorCode.Unauthorized:
-                case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
-                               result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
-                    return Unauthorized(errorResponse);
-
-                case ErrorCode.Forbidden:
-                case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
-                    return StatusCode(403, errorResponse);
-
-                case ErrorCode.Conflict:
-                case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
-                    return Conflict(errorResponse);
-
-                default:
-                    return BadRequest(errorResponse);
-            }
+            return successAction();
         }
 
-        return successAction();
+        var validationErrors = result.Errors
+            .Where(e => !string.IsNullOrEmpty(e.Field))
+            .Select(e => new ValidationError
+            {
+                Field = e.Field!,
+                Message = e.Message,
+                ErrorCode = e.ErrorCode.ToString(),
+                AttemptedValue = e.AttemptedValue
+            })
+            .ToArray();
+
+        var errorResponse = ApiErrorResponse.Create(
+            message: result.Message,
+            errors: result.Errors.Select(e => e.Message).ToArray(),
+            validationErrors: validationErrors
+        );
+        errorResponse.TraceId = HttpContext.TraceIdentifier;
+
+        if (validationErrors.Any())
+        {
+            return BadRequest(errorResponse);
+        }
+
+        var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
+        switch (errorCode)
+        {
+            case ErrorCode.NotFound:
+            case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
+                return NotFound(errorResponse);
+
+            case ErrorCode.Unauthorized:
+            case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
+                           result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
+                return Unauthorized(errorResponse);
+
+            case ErrorCode.Forbidden:
+            case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
+                return StatusCode(403, errorResponse);
+
+            case ErrorCode.Conflict:
+            case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
+                return Conflict(errorResponse);
+
+            default:
+                return BadRequest(errorResponse);
+        }
     }
 
     /// <summary>
-    /// Handles service results without data and returns appropriate HTTP responses using ApiResponse wrapper
+    /// Handles service results without data and returns appropriate HTTP responses using ApiSuccessResponse or ApiErrorResponse
     /// </summary>
     /// <param name="result">Service result to handle</param>
     /// <param name="successAction">Action to execute on success</param>
     /// <returns>Appropriate HTTP response</returns>
     protected IActionResult HandleServiceResult(ServiceResult result, Func<IActionResult> successAction)
     {
-        if (!result.IsSuccess)
+        if (result.IsSuccess)
         {
-            // Map ServiceError to ValidationError for validation-specific errors
-            var validationErrors = result.Errors
-                .Where(e => !string.IsNullOrEmpty(e.Field))
-                .Select(e => new ValidationError
-                {
-                    Field = e.Field!,
-                    Message = e.Message,
-                    ErrorCode = e.ErrorCode.ToString(),
-                    AttemptedValue = e.AttemptedValue
-                })
-                .ToArray();
-
-            if (validationErrors.Any())
-            {
-                var validationErrorResponse = new ValidationErrorResponse
-                {
-                    Message = result.Message,
-                    Errors = validationErrors.Select(e => e.Message).ToArray(),
-                    ValidationErrors = validationErrors,
-                    TraceId = HttpContext.TraceIdentifier
-                };
-                return BadRequest(validationErrorResponse);
-            }
-
-            var errorResponse = ApiResponse.ErrorResponse(result.Message, result.Errors.Select(e => e.Message).ToArray());
-
-            var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
-            switch (errorCode)
-            {
-                case ErrorCode.NotFound:
-                case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
-                    return NotFound(errorResponse);
-
-                case ErrorCode.Unauthorized:
-                case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
-                               result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
-                    return Unauthorized(errorResponse);
-
-                case ErrorCode.Forbidden:
-                case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
-                    return StatusCode(403, errorResponse);
-
-                case ErrorCode.Conflict:
-                case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
-                    return Conflict(errorResponse);
-
-                default:
-                    return BadRequest(errorResponse);
-            }
+            return successAction();
         }
 
-        return successAction() ?? Ok(ApiResponse.SuccessResponse(result.Message));
+        var validationErrors = result.Errors
+            .Where(e => !string.IsNullOrEmpty(e.Field))
+            .Select(e => new ValidationError
+            {
+                Field = e.Field!,
+                Message = e.Message,
+                ErrorCode = e.ErrorCode.ToString(),
+                AttemptedValue = e.AttemptedValue
+            })
+            .ToArray();
+
+        var errorResponse = ApiErrorResponse.Create(
+            message: result.Message,
+            errors: result.Errors.Select(e => e.Message).ToArray(),
+            validationErrors: validationErrors
+        );
+        errorResponse.TraceId = HttpContext.TraceIdentifier;
+
+        if (validationErrors.Any())
+        {
+            return BadRequest(errorResponse);
+        }
+
+        var errorCode = result.Errors.FirstOrDefault()?.ErrorCode;
+        switch (errorCode)
+        {
+            case ErrorCode.NotFound:
+            case var _ when result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase):
+                return NotFound(errorResponse);
+
+            case ErrorCode.Unauthorized:
+            case var _ when result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
+                           result.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase):
+                return Unauthorized(errorResponse);
+
+            case ErrorCode.Forbidden:
+            case var _ when result.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase):
+                return StatusCode(403, errorResponse);
+
+            case ErrorCode.Conflict:
+            case var _ when result.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase):
+                return Conflict(errorResponse);
+
+            default:
+                return BadRequest(errorResponse);
+        }
     }
 
     /// <summary>
@@ -168,17 +161,14 @@ public abstract class BaseApiController : ControllerBase
                 AttemptedValue = e.AttemptedValue?.ToString()
             }).ToArray();
 
-            var errorMessages = validationErrors.Select(e => e.Message).ToArray();
+            var errorResponse = ApiErrorResponse.Create(
+                message: "Validation failed",
+                errors: validationErrors.Select(e => e.Message).ToArray(),
+                validationErrors: validationErrors
+            );
+            errorResponse.TraceId = HttpContext.TraceIdentifier;
 
-            var validationErrorResponse = new ValidationErrorResponse
-            {
-                Message = "Validation failed",
-                Errors = errorMessages,
-                ValidationErrors = validationErrors,
-                TraceId = HttpContext.TraceIdentifier
-            };
-
-            return BadRequest(validationErrorResponse);
+            return BadRequest(errorResponse);
         }
 
         // Check ModelState
@@ -195,24 +185,21 @@ public abstract class BaseApiController : ControllerBase
                 })
                 .ToArray();
 
-            var errorMessages = validationErrors.Select(e => e.Message).ToArray();
+            var errorResponse = ApiErrorResponse.Create(
+                message: "Validation failed",
+                errors: validationErrors.Select(e => e.Message).ToArray(),
+                validationErrors: validationErrors
+            );
+            errorResponse.TraceId = HttpContext.TraceIdentifier;
 
-            var validationErrorResponse = new ValidationErrorResponse
-            {
-                Message = "Validation failed",
-                Errors = errorMessages,
-                ValidationErrors = validationErrors,
-                TraceId = HttpContext.TraceIdentifier
-            };
-
-            return BadRequest(validationErrorResponse);
+            return BadRequest(errorResponse);
         }
 
         return null;
     }
 
     /// <summary>
-    /// Creates a success response with data using ApiResponse wrapper
+    /// Creates a success response with data using ApiSuccessResponse wrapper
     /// </summary>
     /// <typeparam name="T">Type of data being returned</typeparam>
     /// <param name="data">Data to return</param>
@@ -220,19 +207,35 @@ public abstract class BaseApiController : ControllerBase
     /// <returns>Success response</returns>
     protected IActionResult SuccessResponse<T>(T data, string message = "Operation completed successfully")
     {
-        var response = ApiResponse<T>.SuccessResponse(data, message);
+        var response = ApiSuccessResponse<T>.Create(data, message);
+        response.TraceId = HttpContext.TraceIdentifier;
         return Ok(response);
     }
 
     /// <summary>
-    /// Creates a success response without data using ApiResponse wrapper
+    /// Creates a success response without data using ApiSuccessResponse wrapper
     /// </summary>
     /// <param name="message">Success message</param>
     /// <returns>Success response</returns>
     protected IActionResult SuccessResponse(string message = "Operation completed successfully")
     {
-        var response = ApiResponse.SuccessResponse(message);
+        var response = ApiSuccessResponse.Create(message);
+        response.TraceId = HttpContext.TraceIdentifier;
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Creates a 201 Created response with data using ApiSuccessResponse wrapper
+    /// </summary>
+    /// <typeparam name="T">Type of data being returned</typeparam>
+    /// <param name="data">Data to return</param>
+    /// <param name="message">Success message</param>
+    /// <returns>201 Created response</returns>
+    protected IActionResult CreatedResponse<T>(T data, string message = "Resource created successfully")
+    {
+        var response = ApiSuccessResponse<T>.Create(data, message);
+        response.TraceId = HttpContext.TraceIdentifier;
+        return StatusCode(201, response);
     }
 
     #endregion

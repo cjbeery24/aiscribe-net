@@ -20,6 +20,7 @@ using SermonTranscription.Application.Services;
 using SermonTranscription.Application.DTOs;
 using Moq;
 using StackExchange.Redis;
+using System.Text.Json.Serialization;
 
 namespace SermonTranscription.Tests.Integration.Common;
 
@@ -314,10 +315,28 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
         if (string.IsNullOrEmpty(content))
             return default;
 
-        return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+        // Try to deserialize as success response first
+        var successWrapper = JsonSerializer.Deserialize<ApiSuccessResponse<T>>(content, new JsonSerializerOptions
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
         });
+
+        if (successWrapper != null && successWrapper.Success)
+        {
+            return successWrapper.Data;
+        }
+
+        // If not a success response, try to deserialize as error response
+        var errorWrapper = JsonSerializer.Deserialize<ApiErrorResponse>(content, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+        });
+
+        // For error responses, we can't return the data since it's an error
+        // Return default to indicate failure
+        return default;
     }
 
     protected static async Task<T?> ReadApiResponseAsync<T>(HttpResponseMessage response) where T : class
@@ -326,12 +345,39 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
         if (string.IsNullOrEmpty(content))
             return default;
 
-        var apiResponse = JsonSerializer.Deserialize<ApiResponse<T>>(content, new JsonSerializerOptions
+        var apiResponse = JsonSerializer.Deserialize<ApiSuccessResponse<T>>(content, new JsonSerializerOptions
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter() }
         });
 
         return apiResponse?.Data;
+    }
+
+    protected static async Task<ApiErrorResponse?> ReadErrorResponseAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(content))
+            return default;
+
+        return JsonSerializer.Deserialize<ApiErrorResponse>(content, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+        });
+    }
+
+    protected static async Task<ApiSuccessResponse?> ReadSuccessResponseAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(content))
+            return default;
+
+        return JsonSerializer.Deserialize<ApiSuccessResponse>(content, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+        });
     }
 
     protected static async Task AssertSuccessStatusCodeAsync(HttpResponseMessage response)

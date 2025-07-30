@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
@@ -28,12 +27,12 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <returns>List of available subscription plans</returns>
     [HttpGet("plans")]
     [PublicEndpoint]
-    [ProducesResponseType(typeof(IEnumerable<SubscriptionPlanResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<IEnumerable<SubscriptionPlanResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetAvailablePlans()
     {
         var result = await _subscriptionService.GetAvailablePlansAsync(HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Available plans retrieved successfully"));
     }
 
     /// <summary>
@@ -41,14 +40,13 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>Current subscription details</returns>
     [HttpGet("current")]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCurrentSubscription()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _subscriptionService.GetCurrentSubscriptionAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Current subscription retrieved successfully"));
     }
 
     /// <summary>
@@ -56,14 +54,14 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>List of organization subscriptions</returns>
     [HttpGet("history")]
-    [ProducesResponseType(typeof(IEnumerable<SubscriptionResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<IEnumerable<SubscriptionResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSubscriptionHistory()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _subscriptionService.GetOrganizationSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Subscription history retrieved successfully"));
     }
 
     /// <summary>
@@ -73,16 +71,17 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <returns>Created subscription details</returns>
     [HttpPost]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateSubscription([FromBody] CreateSubscriptionRequest request)
     {
+        _logger.LogInformation("Received request with Plan: {Plan}", request.Plan);
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _subscriptionService.CreateSubscriptionAsync(tenantContext.OrganizationId, request.Plan, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => StatusCode(201, SuccessResponse(result.Data, "Subscription created successfully")));
+        return HandleServiceResult(result, () => CreatedResponse(result.Data, "Subscription created successfully"));
     }
 
     /// <summary>
@@ -93,15 +92,15 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <returns>Updated subscription details</returns>
     [HttpPut("{subscriptionId:guid}/plan")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ChangeSubscriptionPlan(Guid subscriptionId, [FromBody] ChangeSubscriptionPlanRequest request)
     {
         var result = await _subscriptionService.ChangeSubscriptionPlanAsync(subscriptionId, request.NewPlan, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Subscription plan changed successfully"));
     }
 
     /// <summary>
@@ -111,15 +110,15 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <returns>Cancelled subscription details</returns>
     [HttpPost("{subscriptionId:guid}/cancel")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CancelSubscription(Guid subscriptionId)
     {
         var result = await _subscriptionService.CancelSubscriptionAsync(subscriptionId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Subscription cancelled successfully"));
     }
 
     /// <summary>
@@ -129,15 +128,15 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <returns>Reactivated subscription details</returns>
     [HttpPost("{subscriptionId:guid}/reactivate")]
     [RequireOrganizationAdmin]
-    [ProducesResponseType(typeof(SubscriptionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ReactivateSubscription(Guid subscriptionId)
     {
         var result = await _subscriptionService.ReactivateSubscriptionAsync(subscriptionId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Subscription reactivated successfully"));
     }
 
     /// <summary>
@@ -145,14 +144,14 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// </summary>
     /// <returns>Usage analytics for current subscription</returns>
     [HttpGet("usage")]
-    [ProducesResponseType(typeof(SubscriptionUsageResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionUsageResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUsageAnalytics()
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _subscriptionService.GetUsageAnalyticsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Usage analytics retrieved successfully"));
     }
 
     /// <summary>
@@ -161,13 +160,13 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     /// <param name="minutes">Minutes to check</param>
     /// <returns>Whether usage is allowed</returns>
     [HttpGet("can-use")]
-    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CanUseTranscriptionMinutes([FromQuery] int minutes)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
         var result = await _subscriptionService.CanUseTranscriptionMinutesAsync(tenantContext.OrganizationId, minutes, HttpContext.RequestAborted);
-        return HandleServiceResult(result, () => Ok(result.Data));
+        return HandleServiceResult(result, () => SuccessResponse(result.Data, "Transcription minutes check completed"));
     }
 }

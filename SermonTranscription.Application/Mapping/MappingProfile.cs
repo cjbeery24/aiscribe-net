@@ -40,6 +40,7 @@ public class MappingProfile : Profile
         // Subscription to SubscriptionResponse mapping
         CreateMap<Subscription, SubscriptionResponse>()
             .ForMember(dest => dest.OrganizationId, opt => opt.MapFrom(src => src.OrganizationId))
+            .ForMember(dest => dest.Plan, opt => opt.MapFrom(src => src.Plan))
             .ForMember(dest => dest.PlanName, opt => opt.MapFrom(src => src.Plan.ToString()))
             .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
             .ForMember(dest => dest.IsExpired, opt => opt.MapFrom(src => src.IsExpired))

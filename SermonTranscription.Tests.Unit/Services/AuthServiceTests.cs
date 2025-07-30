@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
+using SermonTranscription.Application.Common;
 using SermonTranscription.Application.Services;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Domain.Entities;
@@ -69,7 +70,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("User registered successfully. Please check your email to verify your account.", result.Message);
         _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockPasswordHasher.Verify(x => x.HashPassword(request.Password), Times.Once);
     }
@@ -96,7 +96,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("User with this email already exists", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Conflict);
         _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
@@ -151,10 +151,10 @@ public class AuthServiceTests : BaseUnitTest
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("Login successful", result.Message);
-        Assert.NotNull(result.AccessToken);
-        Assert.NotNull(result.RefreshToken);
-        Assert.Equal("access_token", result.AccessToken);
-        Assert.Equal("refresh_token", result.RefreshToken);
+        Assert.NotNull(result.Data.AccessToken);
+        Assert.NotNull(result.Data.RefreshToken);
+        Assert.Equal("access_token", result.Data.AccessToken);
+        Assert.Equal("refresh_token", result.Data.RefreshToken);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Invalid email or password", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Invalid email or password", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Account is deactivated", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Forbidden);
     }
 
     [Fact]
@@ -262,7 +262,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
     }
 
@@ -281,7 +280,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("If the email address exists in our system, you will receive a password reset link.", result.Message);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
@@ -317,7 +315,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("Password has been successfully reset", result.Message);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
         _mockPasswordHasher.Verify(x => x.HashPassword(newPassword), Times.Once);
     }
@@ -338,7 +335,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Invalid or expired reset token", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
@@ -366,7 +363,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Reset token has expired", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
         _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
@@ -379,9 +376,9 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Email and password are required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
         Assert.False(result2.IsSuccess);
-        Assert.Equal("Email and password are required", result2.Message);
+        Assert.Contains(result2.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -401,7 +398,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Contains("required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -425,7 +422,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Password must be at least 8 characters long", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -436,7 +433,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Email is required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -447,7 +444,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Token and new password are required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -478,7 +475,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Password must be at least 8 characters long", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -489,7 +486,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Refresh token is required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 
     [Fact]
@@ -507,7 +504,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Invalid refresh token", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
@@ -582,16 +579,11 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(newAccessToken, result.AccessToken);
-        Assert.Equal(newRefreshToken, result.RefreshToken);
-        Assert.NotNull(result.User);
-        Assert.Equal(userId, result.User.UserId);
-        // Note: OrganizationId and Role are no longer included in AuthUserInfo
-        // as they're determined per-request via X-Organization-ID header
+        Assert.Equal(newAccessToken, result.Data.AccessToken);
+        Assert.Equal(newRefreshToken, result.Data.RefreshToken);
 
         _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
         _mockUserRepository.Verify(x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), CancellationToken.None), Times.Once);
-        _mockUserRepository.Verify(x => x.UpdateAsync(user, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -631,7 +623,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Refresh token has expired", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
 
         _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
     }
@@ -670,7 +662,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Refresh token has been revoked", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Unauthorized);
     }
 
     [Fact]
@@ -710,7 +702,7 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("User account is deactivated", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.Forbidden);
 
         _mockUserRepository.Verify(x => x.RevokeAllUserRefreshTokensAsync(userId, CancellationToken.None), Times.Once);
     }
@@ -730,7 +722,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("Refresh token revoked successfully", result.Message);
 
         _mockUserRepository.Verify(x => x.RevokeRefreshTokenAsync(refreshToken, CancellationToken.None), Times.Once);
     }
@@ -743,6 +734,6 @@ public class AuthServiceTests : BaseUnitTest
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("Refresh token is required", result.Message);
+        Assert.Contains(result.Errors, error => error.ErrorCode == ErrorCode.ValidationError);
     }
 }

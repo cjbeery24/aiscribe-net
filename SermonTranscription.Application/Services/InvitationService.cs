@@ -16,6 +16,7 @@ public class InvitationService
 {
     private readonly IUserRepository _userRepository;
     private readonly IUserOrganizationRepository _userOrganizationRepository;
+    private readonly IOrganizationRepository _organizationRepository;
     private readonly IEmailService _emailService;
     private readonly IJwtService _jwtService;
     private readonly ILogger<InvitationService> _logger;
@@ -25,6 +26,7 @@ public class InvitationService
     public InvitationService(
         IUserRepository userRepository,
         IUserOrganizationRepository userOrganizationRepository,
+        IOrganizationRepository organizationRepository,
         IEmailService emailService,
         IJwtService jwtService,
         ILogger<InvitationService> logger,
@@ -33,6 +35,7 @@ public class InvitationService
     {
         _userRepository = userRepository;
         _userOrganizationRepository = userOrganizationRepository;
+        _organizationRepository = organizationRepository;
         _emailService = emailService;
         _jwtService = jwtService;
         _logger = logger;
@@ -84,6 +87,12 @@ public class InvitationService
                 return ServiceResult<InviteUserResponse>.Failure("Inviting user not found", ErrorCode.NotFound);
             }
 
+            var organization = await _organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+            if (organization == null)
+            {
+                return ServiceResult<InviteUserResponse>.Failure("Organization not found", ErrorCode.NotFound);
+            }
+
             // Generate invitation token
             var invitationToken = GenerateInvitationToken();
 
@@ -127,8 +136,7 @@ public class InvitationService
 
             await _userOrganizationRepository.AddAsync(userOrganization, cancellationToken);
 
-            // TODO: Send invitation email
-            // await _emailService.SendInvitationEmailAsync(user.Email, invitationToken, organizationId);
+            await _emailService.SendInvitationEmailAsync(user.Email, user.FirstName, organization.Name, invitingUser.FirstName, invitationToken);
 
             _logger.LogInformation("User {UserId} invited to organization {OrganizationId} by {InvitedByUserId}",
                 user.Id, organizationId, invitedByUserId);
@@ -217,6 +225,8 @@ public class InvitationService
             userOrganization.AcceptInvitation();
 
             await _userOrganizationRepository.UpdateAsync(userOrganization, cancellationToken);
+
+            await _emailService.SendWelcomeEmailAsync(user.Email, user.FirstName, userOrganization.Organization.Name);
 
             _logger.LogInformation("User {UserId} accepted invitation to organization {OrganizationId}",
                 user.Id, userOrganization.OrganizationId);

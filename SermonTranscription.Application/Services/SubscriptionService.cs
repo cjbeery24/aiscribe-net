@@ -154,14 +154,14 @@ public class SubscriptionService : ISubscriptionService
                     _logger.LogInformation("Downgraded subscription {SubscriptionId} from {OldPlan} to {NewPlan}",
                         subscriptionId, oldPlan, newPlan);
                 }
+
+                await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+                await _subscriptionRepository.SaveChangesAsync(cancellationToken);
             }
             else
             {
                 _logger.LogInformation("Subscription {SubscriptionId} plan unchanged: {Plan}", subscriptionId, newPlan);
             }
-
-            await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
-            await _subscriptionRepository.SaveChangesAsync(cancellationToken);
 
             var response = _mapper.Map<SubscriptionResponse>(subscription);
             return ServiceResult<SubscriptionResponse>.Success(response, "Subscription plan changed successfully");

@@ -5,6 +5,7 @@ using SermonTranscription.Application.DTOs;
 using SermonTranscription.Domain.Enums;
 using System.Net;
 using System.Text.Json;
+using Xunit.Abstractions;
 
 namespace SermonTranscription.Tests.Integration.Controllers;
 
@@ -13,8 +14,11 @@ namespace SermonTranscription.Tests.Integration.Controllers;
 /// </summary>
 public class SubscriptionsControllerTests : BaseIntegrationTest
 {
-    public SubscriptionsControllerTests(TestWebApplicationFactory factory) : base(factory)
+    private readonly ITestOutputHelper _output; // Field to store ITestOutputHelper
+
+    public SubscriptionsControllerTests(TestWebApplicationFactory factory, ITestOutputHelper output) : base(factory)
     {
+        _output = output; // Initialize the output helper
     }
 
     #region GetAvailablePlans Tests
@@ -138,7 +142,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task GetCurrentSubscription_WithNoActiveSubscription_ShouldReturnNotFound()
+    public async Task GetCurrentSubscription_WithNoActiveSubscription_ShouldReturnSuccessWithNullData()
     {
         // Arrange
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
@@ -147,7 +151,10 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/current");
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
+        await AssertStatusCodeAsync(response, HttpStatusCode.OK);
+
+        var result = await ReadJsonResponseAsync<SubscriptionResponse>(response);
+        result.Should().BeNull();
     }
 
     #endregion
@@ -239,17 +246,21 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
 
         var request = new CreateSubscriptionRequest
         {
-            Plan = SubscriptionPlan.Professional,
-            OrganizationId = organization.Id
+            Plan = SubscriptionPlan.Professional
         };
 
-        // Act
-        var response = await HttpClient.PostAsync("/api/v1.0/subscriptions", CreateJsonContent(request));
+        var jsonContent = CreateJsonContent(request);
+        _output.WriteLine(jsonContent.ReadAsStringAsync().Result);
 
+        // Act
+        var response = await HttpClient.PostAsync("/api/v1.0/subscriptions", jsonContent);
+        _output.WriteLine($"Status Code: {response.StatusCode}");
+        _output.WriteLine(await response.Content.ReadAsStringAsync());
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Created);
 
         var result = await ReadJsonResponseAsync<SubscriptionResponse>(response);
+        _output.WriteLine(JsonSerializer.Serialize(result));
         result.Should().NotBeNull();
         result!.Plan.Should().Be(SubscriptionPlan.Professional);
         result.Status.Should().Be(SubscriptionStatus.Active);
@@ -283,7 +294,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task CreateSubscription_WithExistingActiveSubscription_ShouldReturnBadRequest()
+    public async Task CreateSubscription_WithExistingActiveSubscription_ShouldReturnConflict()
     {
         // Arrange
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
@@ -314,7 +325,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var response = await HttpClient.PostAsync("/api/v1.0/subscriptions", CreateJsonContent(request));
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.BadRequest);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Conflict);
     }
 
     #endregion
@@ -421,7 +432,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task ChangeSubscriptionPlan_WithCancelledSubscription_ShouldReturnBadRequest()
+    public async Task ChangeSubscriptionPlan_WithCancelledSubscription_ShouldReturnForbidden()
     {
         // Arrange
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
@@ -453,7 +464,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var response = await HttpClient.PutAsync($"/api/v1.0/subscriptions/{subscription.Id}/plan", CreateJsonContent(request));
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.BadRequest);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
     }
 
     #endregion
@@ -532,7 +543,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task CancelSubscription_WithAlreadyCancelledSubscription_ShouldReturnBadRequest()
+    public async Task CancelSubscription_WithAlreadyCancelledSubscription_ShouldReturnConflict()
     {
         // Arrange
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
@@ -559,7 +570,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var response = await HttpClient.PostAsync($"/api/v1.0/subscriptions/{subscription.Id}/cancel", null);
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.BadRequest);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Conflict);
     }
 
     #endregion
@@ -642,7 +653,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task ReactivateSubscription_WithAlreadyActiveSubscription_ShouldReturnBadRequest()
+    public async Task ReactivateSubscription_WithAlreadyActiveSubscription_ShouldReturnConflict()
     {
         // Arrange
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
@@ -667,7 +678,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var response = await HttpClient.PostAsync($"/api/v1.0/subscriptions/{subscription.Id}/reactivate", null);
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.BadRequest);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Conflict);
     }
 
     #endregion
@@ -700,7 +711,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         await DbContext.SaveChangesAsync();
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/analytics");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/usage");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.OK);
@@ -725,7 +736,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         // Arrange - No authentication headers set
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/analytics");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/usage");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Unauthorized);
@@ -738,7 +749,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         var (user, organization, token) = await CreateAuthenticatedAdminAsync();
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/analytics");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/usage");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -773,17 +784,13 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         await DbContext.SaveChangesAsync();
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/limits/transcription?minutes=100");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/can-use?minutes=100");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.OK);
 
-        var result = await ReadJsonResponseAsync<Dictionary<string, object>>(response);
-        result.Should().NotBeNull();
-        result!.Should().ContainKey("canUseMinutes");
-        result.Should().ContainKey("requestedMinutes");
-        ((JsonElement)result["canUseMinutes"]).GetBoolean().Should().BeTrue(); // 800 + 100 = 900 < 1000
-        ((JsonElement)result["requestedMinutes"]).GetInt32().Should().Be(100);
+        var result = await ReadJsonResponseAsync<bool>(response);
+        result!.Should().BeTrue(); // 800 + 100 = 900 < 1000
     }
 
     [Fact]
@@ -811,17 +818,13 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         await DbContext.SaveChangesAsync();
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/limits/transcription?minutes=100");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/can-use?minutes=100");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.OK);
 
-        var result = await ReadJsonResponseAsync<Dictionary<string, object>>(response);
-        result.Should().NotBeNull();
-        result!.Should().ContainKey("canUseMinutes");
-        result.Should().ContainKey("requestedMinutes");
-        ((JsonElement)result["canUseMinutes"]).GetBoolean().Should().BeFalse(); // 950 + 100 = 1050 > 1000
-        ((JsonElement)result["requestedMinutes"]).GetInt32().Should().Be(100);
+        var result = await ReadJsonResponseAsync<bool>(response);
+        result!.Should().BeFalse(); // 950 + 100 = 1050 > 1000
     }
 
     [Fact]
@@ -830,7 +833,7 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         // Arrange - No authentication headers set
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/limits/transcription?minutes=100");
+        var response = await HttpClient.GetAsync("/api/v1.0/subscriptions/can-use?minutes=100");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Unauthorized);

@@ -144,13 +144,13 @@ public class UsersControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Be("Password changed successfully");
     }
 
     [Fact]
-    public async Task ChangePassword_WithInvalidCurrentPassword_ShouldReturnBadRequest()
+    public async Task ChangePassword_WithInvalidCurrentPassword_ShouldReturnUnauthorized()
     {
         // Arrange
         var user = await CreateTestUserAsync("test@example.com");
@@ -168,7 +168,7 @@ public class UsersControllerTests : BaseIntegrationTest
         var response = await HttpClient.PostAsync("/api/v1.0/users/change-password", CreateJsonContent(request));
 
         // Assert
-        await AssertStatusCodeAsync(response, HttpStatusCode.BadRequest);
+        await AssertStatusCodeAsync(response, HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class UsersControllerTests : BaseIntegrationTest
         };
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/users/organizations/users?pageNumber=1&pageSize=10");
+        var response = await HttpClient.GetAsync("/api/v1.0/users?pageNumber=1&pageSize=10");
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
@@ -257,7 +257,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/users/organizations/users");
+        var response = await HttpClient.GetAsync("/api/v1.0/users");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -273,7 +273,7 @@ public class UsersControllerTests : BaseIntegrationTest
         // Don't set organization header
 
         // Act
-        var response = await HttpClient.GetAsync("/api/v1.0/users/organizations/users");
+        var response = await HttpClient.GetAsync("/api/v1.0/users");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -294,7 +294,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.GetAsync($"/api/v1/users/organizations/users/{secondUser.Id}");
+        var response = await HttpClient.GetAsync($"/api/v1.0/users/{secondUser.Id}");
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
@@ -318,7 +318,7 @@ public class UsersControllerTests : BaseIntegrationTest
         var invalidUserId = Guid.NewGuid();
 
         // Act
-        var response = await HttpClient.GetAsync($"/api/v1/users/organizations/users/{invalidUserId}");
+        var response = await HttpClient.GetAsync($"/api/v1.0/users/{invalidUserId}");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -334,7 +334,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.GetAsync($"/api/v1/users/organizations/users/{user.Id}");
+        var response = await HttpClient.GetAsync($"/api/v1.0/users/{user.Id}");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -360,7 +360,7 @@ public class UsersControllerTests : BaseIntegrationTest
         };
 
         // Act
-        var response = await HttpClient.PutAsync($"/api/v1/users/organizations/users/{secondUser.Id}/role", CreateJsonContent(request));
+        var response = await HttpClient.PutAsync($"/api/v1.0/users/{secondUser.Id}/role", CreateJsonContent(request));
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
@@ -392,7 +392,7 @@ public class UsersControllerTests : BaseIntegrationTest
         };
 
         // Act
-        var response = await HttpClient.PutAsync($"/api/v1/users/organizations/users/{invalidUserId}/role", CreateJsonContent(request));
+        var response = await HttpClient.PutAsync($"/api/v1.0/users/{invalidUserId}/role", CreateJsonContent(request));
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -413,7 +413,7 @@ public class UsersControllerTests : BaseIntegrationTest
         };
 
         // Act
-        var response = await HttpClient.PutAsync($"/api/v1/users/organizations/users/{user.Id}/role", CreateJsonContent(request));
+        var response = await HttpClient.PutAsync($"/api/v1.0/users/{user.Id}/role", CreateJsonContent(request));
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -434,12 +434,12 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.DeleteAsync($"/api/v1/users/organizations/users/{secondUser.Id}");
+        var response = await HttpClient.DeleteAsync($"/api/v1/users/{secondUser.Id}");
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Contain("removed");
 
@@ -461,7 +461,7 @@ public class UsersControllerTests : BaseIntegrationTest
         var invalidUserId = Guid.NewGuid();
 
         // Act
-        var response = await HttpClient.DeleteAsync($"/api/v1/users/organizations/users/{invalidUserId}");
+        var response = await HttpClient.DeleteAsync($"/api/v1.0/users/{invalidUserId}");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -477,7 +477,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.DeleteAsync($"/api/v1/users/organizations/users/{user.Id}");
+        var response = await HttpClient.DeleteAsync($"/api/v1.0/users/{user.Id}");
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -498,12 +498,12 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{secondUser.Id}/deactivate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{secondUser.Id}/deactivate", null);
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Contain("deactivated");
 
@@ -526,7 +526,7 @@ public class UsersControllerTests : BaseIntegrationTest
         var invalidUserId = Guid.NewGuid();
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{invalidUserId}/deactivate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{invalidUserId}/deactivate", null);
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -542,7 +542,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{user.Id}/deactivate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{user.Id}/deactivate", null);
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
@@ -565,12 +565,12 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{secondUser.Id}/activate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{secondUser.Id}/activate", null);
 
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<SuccessResponse>(response);
+        var result = await ReadSuccessResponseAsync(response);
         result.Should().NotBeNull();
         result!.Message.Should().Contain("activated");
 
@@ -593,7 +593,7 @@ public class UsersControllerTests : BaseIntegrationTest
         var invalidUserId = Guid.NewGuid();
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{invalidUserId}/activate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{invalidUserId}/activate", null);
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.NotFound);
@@ -609,7 +609,7 @@ public class UsersControllerTests : BaseIntegrationTest
         SetOrganizationHeader(organization.Id);
 
         // Act
-        var response = await HttpClient.PostAsync($"/api/v1/users/organizations/users/{user.Id}/activate", null);
+        var response = await HttpClient.PostAsync($"/api/v1.0/users/{user.Id}/activate", null);
 
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);

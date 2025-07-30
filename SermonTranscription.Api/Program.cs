@@ -10,7 +10,10 @@ using SermonTranscription.Application.DTOs;
 using SermonTranscription.Infrastructure;
 using Serilog;
 using System.Text;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
+using SermonTranscription.Api.Swagger;
 
 // Create initial configuration to read Serilog settings
 var configuration = new ConfigurationBuilder()
@@ -47,13 +50,17 @@ try
     builder.Services.AddInfrastructure(builder.Configuration);
 
     // Controllers and API Explorer
-    builder.Services.AddControllers();
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
     builder.Services.AddEndpointsApiExplorer();
 
     // Swagger/OpenAPI Configuration
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new()
+        c.SwaggerDoc("v1", new OpenApiInfo
         {
             Title = "Sermon Transcription API",
             Version = "v1",
@@ -61,46 +68,47 @@ try
         });
 
         // JWT Authentication in Swagger
-        c.AddSecurityDefinition("Bearer", new()
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
             Name = "Authorization",
-            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-            Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
             Scheme = "Bearer"
         });
 
-        c.AddSecurityRequirement(new()
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
-        {
-            new()
             {
-                Reference = new() { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            new string[] {}
-        }
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                },
+                new string[] {}
+            }
         });
 
         // Add X-Organization-ID header parameter for all operations
-        c.AddSecurityDefinition("X-Organization-ID", new()
+        c.AddSecurityDefinition("X-Organization-ID", new OpenApiSecurityScheme
         {
             Description = "Organization ID header for multi-tenant requests. Required for most endpoints that operate within an organization context.",
             Name = "X-Organization-ID",
-            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-            Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey
         });
 
-        // Add global parameter for X-Organization-ID
-        c.AddSecurityRequirement(new()
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
-        {
-            new()
             {
-                Reference = new() { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "X-Organization-ID" }
-            },
-            new string[] {}
-        }
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Organization-ID" }
+                },
+                new string[] {}
+            }
         });
+
+        c.OperationFilter<ApiErrorResponseOperationFilter>();
     });
 
     // JWT Authentication Configuration
@@ -154,48 +162,44 @@ try
         // Organization Admin Policy - requires admin role (validated by TenantMiddleware)
         options.AddPolicy(AuthorizationPolicies.OrganizationAdmin, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.IsAdmin()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.IsAdmin()));
 
         // Organization User Policy - requires user or admin role
         options.AddPolicy(AuthorizationPolicies.OrganizationUser, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanManageTranscriptions()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanManageTranscriptions()));
 
         // Read Only User Policy - requires any valid role
         options.AddPolicy(AuthorizationPolicies.ReadOnlyUser, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanViewTranscriptions()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanViewTranscriptions()));
 
         // Can Manage Users Policy
         options.AddPolicy(AuthorizationPolicies.CanManageUsers, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanManageUsers()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanManageUsers()));
 
         // Can Manage Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanManageTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanManageTranscriptions()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanManageTranscriptions()));
 
         // Can View Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanViewTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanViewTranscriptions()));
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanViewTranscriptions()));
 
         // Can Export Transcriptions Policy
         options.AddPolicy(AuthorizationPolicies.CanExportTranscriptions, policy =>
             policy.RequireAuthenticatedUser()
-                   .RequireAssertion(context => context.Resource is HttpContext httpContext &&
-                                               httpContext.CanExportTranscriptions()));
-
-
-
-
+                  .RequireAssertion(context => context.Resource is HttpContext httpContext &&
+                                              httpContext.CanExportTranscriptions()));
 
         // Authenticated User Policy - any valid JWT token
         options.AddPolicy(AuthorizationPolicies.AuthenticatedUser, policy =>
@@ -253,15 +257,14 @@ try
 
             var errorMessages = validationErrors.Select(e => e.Message).ToArray();
 
-            var validationErrorResponse = new ValidationErrorResponse
-            {
-                Message = "Invalid request data",
-                Errors = errorMessages,
-                ValidationErrors = validationErrors,
-                TraceId = context.HttpContext.TraceIdentifier
-            };
+            var errorResponse = ApiErrorResponse.Create(
+                message: "Invalid request data",
+                errors: errorMessages,
+                validationErrors: validationErrors
+            );
+            errorResponse.TraceId = context.HttpContext.TraceIdentifier;
 
-            return new BadRequestObjectResult(validationErrorResponse);
+            return new BadRequestObjectResult(errorResponse);
         };
     });
 
