@@ -20,6 +20,11 @@ public interface ISubscriptionService
     Task<ServiceResult<IEnumerable<SubscriptionResponse>>> GetOrganizationSubscriptionsAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get paginated subscription history for an organization
+    /// </summary>
+    Task<ServiceResult<SubscriptionHistoryResponse>> GetSubscriptionHistoryAsync(Guid organizationId, SubscriptionHistoryRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Create a new subscription for an organization
     /// </summary>
     Task<ServiceResult<SubscriptionResponse>> CreateSubscriptionAsync(Guid organizationId, SubscriptionPlan plan, CancellationToken cancellationToken = default);

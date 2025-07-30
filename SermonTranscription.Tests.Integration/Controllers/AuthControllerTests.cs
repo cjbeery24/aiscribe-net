@@ -272,11 +272,11 @@ public class AuthControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<List<OrganizationSummaryDto>>(response);
+        var result = await ReadJsonResponseAsync<UserOrganizationsResponse>(response);
         result.Should().NotBeNull();
-        result!.Should().HaveCount(1);
-        result[0].Id.Should().Be(organization.Id);
-        result[0].Name.Should().Be(organization.Name);
+        result!.Organizations.Should().HaveCount(1);
+        result.Organizations[0].Id.Should().Be(organization.Id);
+        result.Organizations[0].Name.Should().Be(organization.Name);
     }
 
     [Fact]
@@ -311,11 +311,11 @@ public class AuthControllerTests : BaseIntegrationTest
         // Assert
         await AssertSuccessStatusCodeAsync(response);
 
-        var result = await ReadJsonResponseAsync<List<OrganizationSummaryDto>>(response);
+        var result = await ReadJsonResponseAsync<UserOrganizationsResponse>(response);
         result.Should().NotBeNull();
-        result!.Should().HaveCount(2);
-        result.Should().Contain(o => o.Id == organization1.Id);
-        result.Should().Contain(o => o.Id == organization2.Id);
+        result!.Organizations.Should().HaveCount(2);
+        result.Organizations.Should().Contain(o => o.Id == organization1.Id);
+        result.Organizations.Should().Contain(o => o.Id == organization2.Id);
     }
 
     [Fact]

@@ -165,20 +165,22 @@ public class AuthController : BaseApiController
     }
 
     /// <summary>
-    /// Get user's organizations
+    /// Get user's organizations with pagination and filtering
     /// </summary>
-    /// <returns>List of user's organizations</returns>
+    /// <param name="request">Pagination and filtering parameters</param>
+    /// <returns>Paginated list of user's organizations</returns>
     [HttpGet("organizations")]
     [Authorize]
     [OrganizationAgnostic]
-    [ProducesResponseType(typeof(ApiSuccessResponse<List<OrganizationSummaryDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<UserOrganizationsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetUserOrganizations()
+    public async Task<IActionResult> GetUserOrganizations([FromQuery] UserOrganizationsRequest request)
     {
         var userId = HttpContext.GetUserId()!.Value;
-        var result = await _authService.GetUserOrganizationsAsync(userId, HttpContext.RequestAborted);
+        var result = await _authService.GetUserOrganizationsAsync(userId, request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => SuccessResponse(result.Data, "User organizations retrieved successfully"));
     }
 }

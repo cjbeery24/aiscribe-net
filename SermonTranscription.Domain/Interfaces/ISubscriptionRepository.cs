@@ -1,5 +1,6 @@
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Domain.Interfaces;
 
@@ -12,6 +13,7 @@ public interface ISubscriptionRepository : IBaseRepository<Subscription>
     Task<Subscription?> GetActiveByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<IEnumerable<Subscription>> GetByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<Subscription?> GetCurrentSubscriptionAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<PaginatedResult<Subscription>> GetPaginatedByOrganizationAsync(Guid organizationId, PaginationRequest request, string? status = null, string? plan = null, CancellationToken cancellationToken = default);
 
     // Status-based queries
     Task<IEnumerable<Subscription>> GetByStatusAsync(SubscriptionStatus status, CancellationToken cancellationToken = default);

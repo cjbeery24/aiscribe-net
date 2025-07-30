@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Common;
 using SermonTranscription.Infrastructure.Data;
 
 namespace SermonTranscription.Infrastructure.Repositories;
@@ -31,6 +32,78 @@ public class SubscriptionRepository : BaseRepository<Subscription>, ISubscriptio
             .Where(s => s.OrganizationId == organizationId)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<PaginatedResult<Subscription>> GetPaginatedByOrganizationAsync(Guid organizationId, PaginationRequest request, string? status = null, string? plan = null, CancellationToken cancellationToken = default)
+    {
+        // Build the base query
+        var query = _context.Subscriptions
+            .Include(s => s.Organization)
+            .Where(s => s.OrganizationId == organizationId);
+
+        // Apply filters
+        if (!string.IsNullOrEmpty(status))
+        {
+            if (Enum.TryParse<SubscriptionStatus>(status, true, out var statusEnum))
+            {
+                query = query.Where(s => s.Status == statusEnum);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(plan))
+        {
+            if (Enum.TryParse<SubscriptionPlan>(plan, true, out var planEnum))
+            {
+                query = query.Where(s => s.Plan == planEnum);
+            }
+        }
+
+        // Get total count before applying pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Apply sorting
+        query = request.SortBy?.ToLowerInvariant() switch
+        {
+            "createdat" => request.SortDescending
+                ? query.OrderByDescending(s => s.CreatedAt)
+                : query.OrderBy(s => s.CreatedAt),
+            "updatedat" => request.SortDescending
+                ? query.OrderByDescending(s => s.UpdatedAt)
+                : query.OrderBy(s => s.UpdatedAt),
+            "plan" => request.SortDescending
+                ? query.OrderByDescending(s => s.Plan)
+                : query.OrderBy(s => s.Plan),
+            "status" => request.SortDescending
+                ? query.OrderByDescending(s => s.Status)
+                : query.OrderBy(s => s.Status),
+            "price" => request.SortDescending
+                ? query.OrderByDescending(s => s.MonthlyPrice)
+                : query.OrderBy(s => s.MonthlyPrice),
+            _ => request.SortDescending
+                ? query.OrderByDescending(s => s.CreatedAt)
+                : query.OrderBy(s => s.CreatedAt)
+        };
+
+        // Apply pagination
+        var skip = (request.PageNumber - 1) * request.PageSize;
+        var items = await query
+            .Skip(skip)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // Calculate pagination metadata
+        var totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize);
+
+        return new PaginatedResult<Subscription>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalPages = totalPages,
+            HasNextPage = request.PageNumber < totalPages,
+            HasPreviousPage = request.PageNumber > 1
+        };
     }
 
     public async Task<Subscription?> GetCurrentSubscriptionAsync(Guid organizationId, CancellationToken cancellationToken = default)

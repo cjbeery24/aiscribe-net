@@ -207,16 +207,22 @@ public class SubscriptionsControllerTests : BaseIntegrationTest
         // Assert
         await AssertStatusCodeAsync(response, HttpStatusCode.OK);
 
-        var result = await ReadJsonResponseAsync<List<SubscriptionResponse>>(response);
+        var result = await ReadJsonResponseAsync<SubscriptionHistoryResponse>(response);
         result.Should().NotBeNull();
-        result!.Count.Should().Be(2);
+        result!.Subscriptions.Count.Should().Be(2);
+        result.TotalCount.Should().Be(2);
+        result.PageNumber.Should().Be(1);
+        result.PageSize.Should().Be(10);
+        result.TotalPages.Should().Be(1);
+        result.HasNextPage.Should().BeFalse();
+        result.HasPreviousPage.Should().BeFalse();
 
-        var cancelledSubscription = result.FirstOrDefault(s => s.Status == SubscriptionStatus.Cancelled);
+        var cancelledSubscription = result.Subscriptions.FirstOrDefault(s => s.Status == SubscriptionStatus.Cancelled);
         cancelledSubscription.Should().NotBeNull();
         cancelledSubscription!.Plan.Should().Be(SubscriptionPlan.Basic);
         cancelledSubscription.IsCancelled.Should().BeTrue();
 
-        var activeSubscription = result.FirstOrDefault(s => s.Status == SubscriptionStatus.Active);
+        var activeSubscription = result.Subscriptions.FirstOrDefault(s => s.Status == SubscriptionStatus.Active);
         activeSubscription.Should().NotBeNull();
         activeSubscription!.Plan.Should().Be(SubscriptionPlan.Professional);
         activeSubscription.IsActive.Should().BeTrue();

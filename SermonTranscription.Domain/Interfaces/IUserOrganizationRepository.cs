@@ -1,5 +1,6 @@
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Domain.Interfaces;
 
@@ -17,6 +18,11 @@ public interface IUserOrganizationRepository : IBaseRepository<UserOrganization>
     /// Get all organizations where user is active
     /// </summary>
     Task<IEnumerable<UserOrganization>> GetUserOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get paginated organizations where user is active
+    /// </summary>
+    Task<PaginatedResult<UserOrganization>> GetPaginatedUserOrganizationsAsync(Guid userId, PaginationRequest request, bool? isActive = null, string? role = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get all active users in an organization

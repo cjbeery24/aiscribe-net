@@ -7,6 +7,7 @@ using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Application.Services;
 
@@ -65,6 +66,54 @@ public class SubscriptionService : ISubscriptionService
         {
             _logger.LogError(ex, "Error retrieving subscriptions for organization {OrganizationId}", organizationId);
             return ServiceResult<IEnumerable<SubscriptionResponse>>.Failure("An error occurred while retrieving organization subscriptions", ErrorCode.InternalError);
+        }
+    }
+
+    /// <summary>
+    /// Get paginated subscription history for an organization
+    /// </summary>
+    public async Task<ServiceResult<SubscriptionHistoryResponse>> GetSubscriptionHistoryAsync(Guid organizationId, SubscriptionHistoryRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Validate pagination parameters
+            if (request.PageNumber < 1) request.PageNumber = 1;
+            if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 10;
+
+            // Create pagination request for repository
+            var paginationRequest = new PaginationRequest
+            {
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                SortBy = request.SortBy,
+                SortDescending = request.SortDescending
+            };
+
+            // Get paginated results from repository
+            var paginatedResult = await _subscriptionRepository.GetPaginatedByOrganizationAsync(
+                organizationId,
+                paginationRequest,
+                request.Status,
+                request.Plan,
+                cancellationToken);
+
+            var response = new SubscriptionHistoryResponse
+            {
+                Subscriptions = _mapper.Map<List<SubscriptionResponse>>(paginatedResult.Items),
+                TotalCount = paginatedResult.TotalCount,
+                PageNumber = paginatedResult.PageNumber,
+                PageSize = paginatedResult.PageSize,
+                TotalPages = paginatedResult.TotalPages,
+                HasNextPage = paginatedResult.HasNextPage,
+                HasPreviousPage = paginatedResult.HasPreviousPage
+            };
+
+            return ServiceResult<SubscriptionHistoryResponse>.Success(response, "Subscription history retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subscription history for organization {OrganizationId}", organizationId);
+            return ServiceResult<SubscriptionHistoryResponse>.Failure("An error occurred while retrieving subscription history", ErrorCode.InternalError);
         }
     }
 

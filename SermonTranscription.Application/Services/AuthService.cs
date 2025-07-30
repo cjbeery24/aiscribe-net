@@ -5,6 +5,7 @@ using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Application.Common;
 using SermonTranscription.Application.Interfaces;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Application.Services;
 
@@ -431,19 +432,42 @@ public class AuthService : IAuthService
         return Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).Replace("+", "-").Replace("/", "_").Replace("=", "");
     }
 
-    public async Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default)
+
+
+    public async Task<ServiceResult<UserOrganizationsResponse>> GetUserOrganizationsAsync(Guid userId, UserOrganizationsRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
             var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
             if (user == null)
             {
-                return ServiceResult<List<OrganizationSummaryDto>>.Failure("User not found", ErrorCode.NotFound);
+                return ServiceResult<UserOrganizationsResponse>.Failure("User not found", ErrorCode.NotFound);
             }
 
-            var memberships = await _userOrganizationRepository.GetUserOrganizationsAsync(userId, cancellationToken);
-            var organizations = memberships
-                .Where(m => m.IsActive && m.Organization.IsActive)
+            // Validate pagination parameters
+            if (request.PageNumber < 1) request.PageNumber = 1;
+            if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 10;
+
+            // Create pagination request for repository
+            var paginationRequest = new PaginationRequest
+            {
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                SortBy = request.SortBy,
+                SortDescending = request.SortDescending
+            };
+
+            // Get paginated results from repository
+            var paginatedResult = await _userOrganizationRepository.GetPaginatedUserOrganizationsAsync(
+                userId,
+                paginationRequest,
+                request.IsActive,
+                request.Role,
+                cancellationToken);
+
+            // Map to DTOs
+            var organizations = paginatedResult.Items
+                .Where(m => m.Organization.IsActive) // Additional filter for active organizations
                 .Select(m => new OrganizationSummaryDto
                 {
                     Id = m.Organization.Id,
@@ -454,12 +478,23 @@ public class AuthService : IAuthService
                 })
                 .ToList();
 
-            return ServiceResult<List<OrganizationSummaryDto>>.Success(organizations, "User organizations retrieved successfully");
+            var response = new UserOrganizationsResponse
+            {
+                Organizations = organizations,
+                TotalCount = paginatedResult.TotalCount,
+                PageNumber = paginatedResult.PageNumber,
+                PageSize = paginatedResult.PageSize,
+                TotalPages = paginatedResult.TotalPages,
+                HasNextPage = paginatedResult.HasNextPage,
+                HasPreviousPage = paginatedResult.HasPreviousPage
+            };
+
+            return ServiceResult<UserOrganizationsResponse>.Success(response, "User organizations retrieved successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving organizations for user {UserId}", userId);
-            return ServiceResult<List<OrganizationSummaryDto>>.Failure("An error occurred while retrieving user organizations", ErrorCode.InternalError);
+            return ServiceResult<UserOrganizationsResponse>.Failure("An error occurred while retrieving user organizations", ErrorCode.InternalError);
         }
     }
 }

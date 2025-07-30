@@ -118,8 +118,8 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 3.2 Implement user profile management and organization user endpoints
   - [x] 3.3 Build subscription plan management with tier-based feature access
   - [x] 3.4 Add organization dashboard data aggregation endpoints
-  - [ ] 3.5 Implement input validation, error handling, and consistent API responses
-  - [ ] 3.6 Add pagination support for list endpoints
+  - [x] 3.5 Implement input validation, error handling, and consistent API responses
+  - [x] 3.6 Add pagination support for list endpoints
   - [ ] 3.7 Create organization settings management for audio/transcription configuration
   - [ ] 3.8 Implement usage tracking and subscription limit enforcement
 - [ ] 4.0 Transcription System & Real-Time Features

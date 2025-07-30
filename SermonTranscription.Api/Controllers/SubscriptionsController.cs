@@ -50,17 +50,19 @@ public class SubscriptionsController : BaseAuthenticatedApiController
     }
 
     /// <summary>
-    /// Get organization subscription history
+    /// Get organization subscription history with pagination
     /// </summary>
-    /// <returns>List of organization subscriptions</returns>
+    /// <param name="request">Pagination and filtering parameters</param>
+    /// <returns>Paginated list of organization subscriptions</returns>
     [HttpGet("history")]
-    [ProducesResponseType(typeof(ApiSuccessResponse<IEnumerable<SubscriptionResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiSuccessResponse<SubscriptionHistoryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetSubscriptionHistory()
+    public async Task<IActionResult> GetSubscriptionHistory([FromQuery] SubscriptionHistoryRequest request)
     {
         var tenantContext = HttpContext.GetTenantContext()!;
-        var result = await _subscriptionService.GetOrganizationSubscriptionsAsync(tenantContext.OrganizationId, HttpContext.RequestAborted);
+        var result = await _subscriptionService.GetSubscriptionHistoryAsync(tenantContext.OrganizationId, request, HttpContext.RequestAborted);
         return HandleServiceResult(result, () => SuccessResponse(result.Data, "Subscription history retrieved successfully"));
     }
 

@@ -15,5 +15,5 @@ public interface IAuthService
     Task<ServiceResult<LogoutResponse>> RevokeAllUserRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default);
     Task<ServiceResult<ResetPasswordResponse>> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default);
-    Task<ServiceResult<List<OrganizationSummaryDto>>> GetUserOrganizationsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<UserOrganizationsResponse>> GetUserOrganizationsAsync(Guid userId, UserOrganizationsRequest request, CancellationToken cancellationToken = default);
 }
