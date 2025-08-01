@@ -63,6 +63,17 @@ Based on: `prd-live-sermon-transcription-api.md`
 - `SermonTranscription.Application/Services/TranscriptionService.cs` - Transcription processing service
 - `SermonTranscription.Application/Services/OrganizationService.cs` - Organization management service
 - `SermonTranscription.Application/Services/GladiaService.cs` - Gladia AI integration service
+- `SermonTranscription.Application/Services/TranscriptionSessionService.cs` - Transcription session management service
+- `SermonTranscription.Application/Interfaces/ITranscriptionSessionService.cs` - Transcription session service interface
+- `SermonTranscription.Application/DTOs/CreateTranscriptionSessionRequest.cs` - DTO for creating transcription sessions
+- `SermonTranscription.Application/DTOs/UpdateTranscriptionSessionRequest.cs` - DTO for updating transcription sessions
+- `SermonTranscription.Application/DTOs/TranscriptionSessionResponse.cs` - DTO for transcription session responses
+- `SermonTranscription.Application/DTOs/TranscriptionSessionListResponse.cs` - DTO for paginated transcription session lists
+- `SermonTranscription.Application/DTOs/TranscriptionSessionSearchRequest.cs` - DTO for searching transcription sessions
+- `SermonTranscription.Application/Validators/CreateTranscriptionSessionRequestValidator.cs` - Validator for create session requests
+- `SermonTranscription.Application/Validators/UpdateTranscriptionSessionRequestValidator.cs` - Validator for update session requests
+- `SermonTranscription.Application/Validators/TranscriptionSessionSearchRequestValidator.cs` - Validator for session search requests
+- `SermonTranscription.Api/Controllers/SessionsController.cs` - Transcription session management endpoints
 - `SermonTranscription.Application/DTOs/UserDto.cs` - User data transfer objects
 - `SermonTranscription.Application/DTOs/TranscriptionDto.cs` - Transcription data transfer objects
 - `SermonTranscription.Infrastructure/Data/AppDbContext.cs` - Entity Framework database context
@@ -120,11 +131,11 @@ Based on: `prd-live-sermon-transcription-api.md`
   - [x] 3.4 Add organization dashboard data aggregation endpoints
   - [x] 3.5 Implement input validation, error handling, and consistent API responses
   - [x] 3.6 Add pagination support for list endpoints
-  - [ ] 3.7 Create organization settings management for audio/transcription configuration
-  - [ ] 3.8 Implement usage tracking and subscription limit enforcement
+  - [x] 3.7 Create organization settings management for audio/transcription configuration
+  - [x] 3.8 Implement usage tracking and subscription limit enforcement
 - [ ] 4.0 Transcription System & Real-Time Features
-  - [ ] 4.1 Set up SignalR hub for real-time communication with connection management
-  - [ ] 4.2 Create transcription session entity and management endpoints
+  - [x] 4.1 Set up SignalR hub for real-time communication with connection management
+  - [x] 4.2 Create transcription session entity and management endpoints
   - [ ] 4.3 Implement audio streaming endpoints for live session input
   - [ ] 4.4 Integrate with Gladia AI API for real-time transcription processing
   - [ ] 4.5 Build transcription CRUD operations with organization-scoped access

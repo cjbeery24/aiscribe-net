@@ -199,4 +199,86 @@ public class UserOrganizationRepository : BaseRepository<UserOrganization>, IUse
         return await _context.UserOrganizations
             .CountAsync(uo => uo.UserId == userId && uo.IsActive, cancellationToken);
     }
+
+    /// <summary>
+    /// Get paginated users in an organization with filtering and sorting
+    /// </summary>
+    public async Task<PaginatedResult<UserOrganization>> GetPaginatedOrganizationUsersAsync(
+        Guid organizationId,
+        PaginationRequest paginationRequest,
+        string? searchTerm = null,
+        string? role = null,
+        bool? isActive = null,
+        bool? isEmailVerified = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Build the base query
+        var query = _context.UserOrganizations
+            .Include(uo => uo.User)
+            .Where(uo => uo.OrganizationId == organizationId);
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var searchTermLower = searchTerm.ToLower();
+            query = query.Where(uo =>
+                uo.User.FirstName.ToLower().Contains(searchTermLower) ||
+                uo.User.LastName.ToLower().Contains(searchTermLower) ||
+                uo.User.Email.ToLower().Contains(searchTermLower));
+        }
+
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            if (Enum.TryParse<UserRole>(role, true, out var roleEnum))
+            {
+                query = query.Where(uo => uo.Role == roleEnum);
+            }
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(uo => uo.IsActive == isActive.Value);
+        }
+
+        if (isEmailVerified.HasValue)
+        {
+            query = query.Where(uo => uo.User.IsEmailVerified == isEmailVerified.Value);
+        }
+
+        // Get total count before applying pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Apply sorting
+        var sortBy = paginationRequest.SortBy?.ToLower() ?? "firstname";
+        query = sortBy switch
+        {
+            "firstname" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.User.FirstName) : query.OrderBy(uo => uo.User.FirstName),
+            "lastname" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.User.LastName) : query.OrderBy(uo => uo.User.LastName),
+            "email" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.User.Email) : query.OrderBy(uo => uo.User.Email),
+            "role" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.Role) : query.OrderBy(uo => uo.Role),
+            "isactive" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.IsActive) : query.OrderBy(uo => uo.IsActive),
+            "createdat" => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.CreatedAt) : query.OrderBy(uo => uo.CreatedAt),
+            _ => paginationRequest.SortDescending ? query.OrderByDescending(uo => uo.User.FirstName) : query.OrderBy(uo => uo.User.FirstName)
+        };
+
+        // Apply pagination
+        var items = await query
+            .Skip((paginationRequest.PageNumber - 1) * paginationRequest.PageSize)
+            .Take(paginationRequest.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // Calculate pagination metadata
+        var totalPages = (int)Math.Ceiling((double)totalCount / paginationRequest.PageSize);
+
+        return new PaginatedResult<UserOrganization>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = paginationRequest.PageNumber,
+            PageSize = paginationRequest.PageSize,
+            TotalPages = totalPages,
+            HasNextPage = paginationRequest.PageNumber < totalPages,
+            HasPreviousPage = paginationRequest.PageNumber > 1
+        };
+    }
 }

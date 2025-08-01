@@ -6,6 +6,7 @@ using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
 using SermonTranscription.Domain.Exceptions;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Application.Services;
 
@@ -164,71 +165,35 @@ public class OrganizationService : IOrganizationService
     {
         try
         {
-            // Validate pagination parameters
-            if (request.PageNumber < 1) request.PageNumber = 1;
-            if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 10;
-
-            // Get organizations based on search criteria
-            IEnumerable<Organization> organizations;
-
-            // Optimize based on filters
-            if (request.IsActive == true)
+            // Create pagination request
+            var paginationRequest = new PaginationRequest
             {
-                // Use repository method for active organizations
-                organizations = await _organizationRepository.GetActiveOrganizationsAsync(cancellationToken);
-            }
-            else if (!string.IsNullOrWhiteSpace(request.SearchTerm))
-            {
-                // Use repository method for name search
-                organizations = await _organizationRepository.SearchByNameAsync(request.SearchTerm, cancellationToken);
-            }
-            else
-            {
-                // Get all organizations
-                organizations = await _organizationRepository.GetAllAsync(cancellationToken);
-            }
-
-            // Apply additional filters that can't be done at database level
-            var filteredOrganizations = organizations.AsEnumerable();
-
-            if (request.IsActive.HasValue && request.IsActive.Value == false)
-            {
-                // Filter for inactive organizations (since we already have active ones from repository)
-                filteredOrganizations = filteredOrganizations.Where(o => !o.IsActive);
-            }
-
-            if (request.HasActiveSubscription.HasValue)
-            {
-                filteredOrganizations = filteredOrganizations.Where(o => o.HasActiveSubscription() == request.HasActiveSubscription.Value);
-            }
-
-            // Apply sorting
-            filteredOrganizations = request.SortBy?.ToLower() switch
-            {
-                "name" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.Name) : filteredOrganizations.OrderBy(o => o.Name),
-                "createdat" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.CreatedAt) : filteredOrganizations.OrderBy(o => o.CreatedAt),
-                "activeusercount" => request.SortDescending ? filteredOrganizations.OrderByDescending(o => o.GetActiveUserCount()) : filteredOrganizations.OrderBy(o => o.GetActiveUserCount()),
-                _ => filteredOrganizations.OrderBy(o => o.Name)
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                SortBy = request.SortBy,
+                SortDescending = request.SortDescending
             };
 
-            // Apply pagination
-            var totalCount = filteredOrganizations.Count();
-            var totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize);
+            // Get paginated results from repository
+            var paginatedResult = await _organizationRepository.GetPaginatedOrganizationsAsync(
+                paginationRequest,
+                request.SearchTerm,
+                request.IsActive,
+                request.HasActiveSubscription,
+                cancellationToken);
 
-            var pagedOrganizations = filteredOrganizations
-                .Skip((request.PageNumber - 1) * request.PageSize)
-                .Take(request.PageSize)
-                .ToList();
+            // Map to DTOs
+            var organizations = paginatedResult.Items.Select(MapToOrganizationSummaryDto).ToList();
 
             var response = new OrganizationListResponse
             {
-                Organizations = pagedOrganizations.Select(MapToOrganizationSummaryDto).ToList(),
-                TotalCount = totalCount,
-                PageNumber = request.PageNumber,
-                PageSize = request.PageSize,
-                TotalPages = totalPages,
-                HasNextPage = request.PageNumber < totalPages,
-                HasPreviousPage = request.PageNumber > 1
+                Organizations = organizations,
+                TotalCount = paginatedResult.TotalCount,
+                PageNumber = paginatedResult.PageNumber,
+                PageSize = paginatedResult.PageSize,
+                TotalPages = paginatedResult.TotalPages,
+                HasNextPage = paginatedResult.HasNextPage,
+                HasPreviousPage = paginatedResult.HasPreviousPage
             };
 
             return ServiceResult<OrganizationListResponse>.Success(response);

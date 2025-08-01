@@ -329,9 +329,25 @@ public class OrganizationServiceTests : BaseUnitTest
 
         var organizations = TestDataFactory.OrganizationFaker.Generate(5);
 
+        var paginatedResult = new Domain.Common.PaginatedResult<Organization>
+        {
+            Items = organizations,
+            TotalCount = 5,
+            PageNumber = 1,
+            PageSize = 10,
+            TotalPages = 1,
+            HasNextPage = false,
+            HasPreviousPage = false
+        };
+
         _mockOrganizationRepository
-            .Setup(x => x.SearchByNameAsync(request.SearchTerm, CancellationToken.None))
-            .ReturnsAsync(organizations);
+            .Setup(x => x.GetPaginatedOrganizationsAsync(
+                It.IsAny<Domain.Common.PaginationRequest>(),
+                request.SearchTerm,
+                request.IsActive,
+                request.HasActiveSubscription,
+                CancellationToken.None))
+            .ReturnsAsync(paginatedResult);
 
         // Act
         var result = await _organizationService.GetOrganizationsAsync(request);
@@ -358,9 +374,25 @@ public class OrganizationServiceTests : BaseUnitTest
 
         var organizations = TestDataFactory.OrganizationFaker.Generate(3);
 
+        var paginatedResult = new Domain.Common.PaginatedResult<Organization>
+        {
+            Items = organizations,
+            TotalCount = 3,
+            PageNumber = 1,
+            PageSize = 10,
+            TotalPages = 1,
+            HasNextPage = false,
+            HasPreviousPage = false
+        };
+
         _mockOrganizationRepository
-            .Setup(x => x.GetActiveOrganizationsAsync(CancellationToken.None))
-            .ReturnsAsync(organizations);
+            .Setup(x => x.GetPaginatedOrganizationsAsync(
+                It.IsAny<Domain.Common.PaginationRequest>(),
+                request.SearchTerm,
+                request.IsActive,
+                request.HasActiveSubscription,
+                CancellationToken.None))
+            .ReturnsAsync(paginatedResult);
 
         // Act
         var result = await _organizationService.GetOrganizationsAsync(request);
@@ -368,7 +400,12 @@ public class OrganizationServiceTests : BaseUnitTest
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().NotBeNull();
-        _mockOrganizationRepository.Verify(x => x.GetActiveOrganizationsAsync(CancellationToken.None), Times.Once);
+        _mockOrganizationRepository.Verify(x => x.GetPaginatedOrganizationsAsync(
+            It.IsAny<Domain.Common.PaginationRequest>(),
+            request.SearchTerm,
+            request.IsActive,
+            request.HasActiveSubscription,
+            CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -383,9 +420,25 @@ public class OrganizationServiceTests : BaseUnitTest
 
         var organizations = TestDataFactory.OrganizationFaker.Generate(2);
 
+        var paginatedResult = new Domain.Common.PaginatedResult<Organization>
+        {
+            Items = organizations,
+            TotalCount = 2,
+            PageNumber = 1,
+            PageSize = 10,
+            TotalPages = 1,
+            HasNextPage = false,
+            HasPreviousPage = false
+        };
+
         _mockOrganizationRepository
-            .Setup(x => x.GetAllAsync(CancellationToken.None))
-            .ReturnsAsync(organizations);
+            .Setup(x => x.GetPaginatedOrganizationsAsync(
+                It.IsAny<Domain.Common.PaginationRequest>(),
+                request.SearchTerm,
+                request.IsActive,
+                request.HasActiveSubscription,
+                CancellationToken.None))
+            .ReturnsAsync(paginatedResult);
 
         // Act
         var result = await _organizationService.GetOrganizationsAsync(request);

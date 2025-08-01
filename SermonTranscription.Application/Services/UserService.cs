@@ -7,6 +7,7 @@ using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Exceptions;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Common;
 
 namespace SermonTranscription.Application.Services;
 
@@ -180,38 +181,37 @@ public class UserService : IUserService
     {
         try
         {
-            var users = await _userOrganizationRepository.GetOrganizationUsersAsync(organizationId, cancellationToken);
-            var totalCount = await _userOrganizationRepository.GetActiveUserCountAsync(organizationId, cancellationToken);
+            // Create pagination request
+            var paginationRequest = new PaginationRequest
+            {
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                SortBy = request.SortBy,
+                SortDescending = request.SortDescending
+            };
 
-            // Apply filtering and pagination in memory for now
-            var filteredUsers = users.Where(u =>
-                (string.IsNullOrEmpty(request.SearchTerm) ||
-                 u.User.FirstName.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                 u.User.LastName.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                 u.User.Email.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase)) &&
-                (string.IsNullOrEmpty(request.Role) || u.Role.ToString() == request.Role) &&
-                (!request.IsActive.HasValue || u.IsActive == request.IsActive.Value) &&
-                (!request.IsEmailVerified.HasValue || u.User.IsEmailVerified == request.IsEmailVerified.Value)
-            ).ToList();
+            // Get paginated results from repository
+            var paginatedResult = await _userOrganizationRepository.GetPaginatedOrganizationUsersAsync(
+                organizationId,
+                paginationRequest,
+                request.SearchTerm,
+                request.Role,
+                request.IsActive,
+                request.IsEmailVerified,
+                cancellationToken);
 
-            var totalPages = (int)Math.Ceiling((double)filteredUsers.Count / request.PageSize);
-            var hasNextPage = request.PageNumber < totalPages;
-            var hasPreviousPage = request.PageNumber > 1;
-
-            var pagedUsers = filteredUsers
-                .Skip((request.PageNumber - 1) * request.PageSize)
-                .Take(request.PageSize)
-                .ToList();
+            // Map to DTOs
+            var users = paginatedResult.Items.Select(u => _mapper.Map<OrganizationUserResponse>(u)).ToList();
 
             var response = new OrganizationUserListResponse
             {
-                Users = pagedUsers.Select(u => _mapper.Map<OrganizationUserResponse>(u)).ToList(),
-                TotalCount = filteredUsers.Count,
-                PageNumber = request.PageNumber,
-                PageSize = request.PageSize,
-                TotalPages = totalPages,
-                HasNextPage = hasNextPage,
-                HasPreviousPage = hasPreviousPage
+                Users = users,
+                TotalCount = paginatedResult.TotalCount,
+                PageNumber = paginatedResult.PageNumber,
+                PageSize = paginatedResult.PageSize,
+                TotalPages = paginatedResult.TotalPages,
+                HasNextPage = paginatedResult.HasNextPage,
+                HasPreviousPage = paginatedResult.HasPreviousPage
             };
 
             return ServiceResult<OrganizationUserListResponse>.Success(response);

@@ -46,5 +46,18 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.IsExpired, opt => opt.MapFrom(src => src.IsExpired))
             .ForMember(dest => dest.IsCancelled, opt => opt.MapFrom(src => src.IsCancelled))
             .ForMember(dest => dest.RemainingTranscriptionMinutes, opt => opt.MapFrom(src => src.RemainingTranscriptionMinutes));
+
+        // TranscriptionSession to TranscriptionSessionResponse mapping
+        CreateMap<TranscriptionSession, TranscriptionSessionResponse>()
+            .ForMember(dest => dest.OrganizationName, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedByUserName, opt => opt.Ignore())
+            .ForMember(dest => dest.Duration, opt => opt.MapFrom(src => src.Duration))
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+            .ForMember(dest => dest.CanStart, opt => opt.MapFrom(src => src.CanStart))
+            .ForMember(dest => dest.CanPause, opt => opt.MapFrom(src => src.CanPause))
+            .ForMember(dest => dest.CanResume, opt => opt.MapFrom(src => src.CanResume))
+            .ForMember(dest => dest.CanComplete, opt => opt.MapFrom(src => src.CanComplete))
+            .ForMember(dest => dest.TranscriptionCount, opt => opt.Ignore())
+            .ForMember(dest => dest.TotalTranscriptionDuration, opt => opt.Ignore());
     }
 }

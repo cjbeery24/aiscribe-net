@@ -30,6 +30,18 @@ public interface IUserOrganizationRepository : IBaseRepository<UserOrganization>
     Task<IEnumerable<UserOrganization>> GetOrganizationUsersAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get paginated users in an organization with filtering and sorting
+    /// </summary>
+    Task<PaginatedResult<UserOrganization>> GetPaginatedOrganizationUsersAsync(
+        Guid organizationId,
+        PaginationRequest paginationRequest,
+        string? searchTerm = null,
+        string? role = null,
+        bool? isActive = null,
+        bool? isEmailVerified = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get users in an organization with specific role
     /// </summary>
     Task<IEnumerable<UserOrganization>> GetOrganizationUsersByRoleAsync(Guid organizationId, UserRole role, CancellationToken cancellationToken = default);

@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.IdentityModel.Tokens;
 using SermonTranscription.Api.Authorization;
+using SermonTranscription.Api.Hubs;
 using SermonTranscription.Api.Middleware;
+using SermonTranscription.Api.Services;
 using SermonTranscription.Application;
 using SermonTranscription.Application.DTOs;
 using SermonTranscription.Infrastructure;
@@ -222,6 +224,7 @@ try
 
     // SignalR
     builder.Services.AddSignalR();
+    builder.Services.AddScoped<ISignalRService, SignalRService>();
 
     // CORS Configuration
     builder.Services.AddCors(options =>
@@ -378,8 +381,8 @@ try
     // Controllers
     app.MapControllers();
 
-    // SignalR Hubs (will be implemented later)
-    // app.MapHub<TranscriptionHub>("/hubs/transcription");
+    // SignalR Hubs
+    app.MapHub<TranscriptionHub>("/hubs/transcription");
 
     // Health Checks
     app.MapHealthChecks("/health");

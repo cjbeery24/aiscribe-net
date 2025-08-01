@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Domain.Common;
 using SermonTranscription.Infrastructure.Data;
 
 namespace SermonTranscription.Infrastructure.Repositories;
@@ -87,5 +88,77 @@ public class OrganizationRepository : BaseRepository<Organization>, IOrganizatio
         return await _dbSet
             .Where(o => o.Name.Contains(searchTerm))
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Get paginated organizations with filtering and sorting
+    /// </summary>
+    public async Task<PaginatedResult<Organization>> GetPaginatedOrganizationsAsync(
+        PaginationRequest paginationRequest,
+        string? searchTerm = null,
+        bool? isActive = null,
+        bool? hasActiveSubscription = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Build the base query
+        var query = _dbSet.AsQueryable();
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var searchTermLower = searchTerm.ToLower();
+            query = query.Where(o => o.Name.ToLower().Contains(searchTermLower));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(o => o.IsActive == isActive.Value);
+        }
+
+        if (hasActiveSubscription.HasValue)
+        {
+            if (hasActiveSubscription.Value)
+            {
+                query = query.Where(o => o.Subscriptions.Any(s => s.Status == Domain.Enums.SubscriptionStatus.Active));
+            }
+            else
+            {
+                query = query.Where(o => !o.Subscriptions.Any(s => s.Status == Domain.Enums.SubscriptionStatus.Active));
+            }
+        }
+
+        // Get total count before applying pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Apply sorting
+        var sortBy = paginationRequest.SortBy?.ToLower() ?? "name";
+        query = sortBy switch
+        {
+            "name" => paginationRequest.SortDescending ? query.OrderByDescending(o => o.Name) : query.OrderBy(o => o.Name),
+            "createdat" => paginationRequest.SortDescending ? query.OrderByDescending(o => o.CreatedAt) : query.OrderBy(o => o.CreatedAt),
+            "updatedat" => paginationRequest.SortDescending ? query.OrderByDescending(o => o.UpdatedAt) : query.OrderBy(o => o.UpdatedAt),
+            "isactive" => paginationRequest.SortDescending ? query.OrderByDescending(o => o.IsActive) : query.OrderBy(o => o.IsActive),
+            _ => paginationRequest.SortDescending ? query.OrderByDescending(o => o.Name) : query.OrderBy(o => o.Name)
+        };
+
+        // Apply pagination
+        var items = await query
+            .Skip((paginationRequest.PageNumber - 1) * paginationRequest.PageSize)
+            .Take(paginationRequest.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // Calculate pagination metadata
+        var totalPages = (int)Math.Ceiling((double)totalCount / paginationRequest.PageSize);
+
+        return new PaginatedResult<Organization>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = paginationRequest.PageNumber,
+            PageSize = paginationRequest.PageSize,
+            TotalPages = totalPages,
+            HasNextPage = paginationRequest.PageNumber < totalPages,
+            HasPreviousPage = paginationRequest.PageNumber > 1
+        };
     }
 }

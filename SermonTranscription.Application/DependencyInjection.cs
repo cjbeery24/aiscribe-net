@@ -21,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<ITranscriptionSessionService, TranscriptionSessionService>();
+
         services.AddScoped<InvitationService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IPasswordValidator, PasswordValidator>();
