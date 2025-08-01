@@ -21,6 +21,8 @@ public class UserService : IUserService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordValidator _passwordValidator;
     private readonly IMapper _mapper;
+    private readonly IUserOrganizationCacheService _userOrganizationCacheService;
+    private readonly IUserCacheService _userCacheService;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
@@ -29,6 +31,8 @@ public class UserService : IUserService
         IPasswordHasher passwordHasher,
         IPasswordValidator passwordValidator,
         IMapper mapper,
+        IUserOrganizationCacheService userOrganizationCacheService,
+        IUserCacheService userCacheService,
         ILogger<UserService> logger)
     {
         _userRepository = userRepository;
@@ -36,6 +40,8 @@ public class UserService : IUserService
         _passwordHasher = passwordHasher;
         _passwordValidator = passwordValidator;
         _mapper = mapper;
+        _userOrganizationCacheService = userOrganizationCacheService;
+        _userCacheService = userCacheService;
         _logger = logger;
     }
 
@@ -79,6 +85,9 @@ public class UserService : IUserService
 
             await _userRepository.UpdateAsync(user, cancellationToken);
 
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(userId);
+
             var response = _mapper.Map<UserProfileResponse>(user);
             return ServiceResult<UserProfileResponse>.Success(response, "User profile updated successfully");
         }
@@ -121,6 +130,9 @@ public class UserService : IUserService
 
             await _userRepository.UpdateAsync(user, cancellationToken);
 
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(userId);
+
             _logger.LogInformation("Password changed successfully for user {UserId}", userId);
             return ServiceResult.Success("Password changed successfully");
         }
@@ -144,6 +156,9 @@ public class UserService : IUserService
             user.Deactivate();
             await _userRepository.UpdateAsync(user, cancellationToken);
 
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(userId);
+
             _logger.LogInformation("User {UserId} deactivated", userId);
             return ServiceResult.Success("User deactivated successfully");
         }
@@ -166,6 +181,9 @@ public class UserService : IUserService
 
             user.Activate();
             await _userRepository.UpdateAsync(user, cancellationToken);
+
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(userId);
 
             _logger.LogInformation("User {UserId} activated", userId);
             return ServiceResult.Success("User activated successfully");
@@ -262,6 +280,9 @@ public class UserService : IUserService
             userOrg.UpdateRole(role);
             await _userOrganizationRepository.UpdateAsync(userOrg, cancellationToken);
 
+            // Invalidate user cache since user's role changed
+            _userOrganizationCacheService.InvalidateUserCache(userId);
+
             var response = _mapper.Map<OrganizationUserResponse>(userOrg);
             return ServiceResult<OrganizationUserResponse>.Success(response, "User role updated successfully");
         }
@@ -283,6 +304,9 @@ public class UserService : IUserService
             }
 
             await _userOrganizationRepository.DeleteAsync(userOrg, cancellationToken);
+
+            // Invalidate user cache since user was removed from organization
+            _userOrganizationCacheService.InvalidateUserCache(userId);
 
             _logger.LogInformation("User {UserId} removed from organization {OrganizationId}", userId, organizationId);
             return ServiceResult.Success("User removed from organization successfully");
@@ -306,6 +330,9 @@ public class UserService : IUserService
 
             userOrg.Deactivate();
             await _userOrganizationRepository.UpdateAsync(userOrg, cancellationToken);
+
+            // Invalidate user cache since user's organization membership status changed
+            _userOrganizationCacheService.InvalidateUserCache(userId);
 
             _logger.LogInformation("Organization user {UserId} deactivated in organization {OrganizationId}", userId, organizationId);
             return ServiceResult.Success("Organization user deactivated successfully");

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SermonTranscription.Api.Middleware;
@@ -14,6 +15,7 @@ namespace SermonTranscription.Tests.Unit.Middleware;
 public class TenantMiddlewareTests : BaseUnitTest
 {
     private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<IUserOrganizationCacheService> _mockUserOrganizationCacheService;
     private readonly Mock<ILogger<TenantMiddleware>> _mockLogger;
     private readonly TenantMiddleware _middleware;
     private readonly DefaultHttpContext _httpContext;
@@ -21,8 +23,13 @@ public class TenantMiddlewareTests : BaseUnitTest
     public TenantMiddlewareTests()
     {
         _mockUserRepository = new Mock<IUserRepository>();
+        _mockUserOrganizationCacheService = new Mock<IUserOrganizationCacheService>();
         _mockLogger = new Mock<ILogger<TenantMiddleware>>();
-        _middleware = new TenantMiddleware(next: (context) => Task.CompletedTask, _mockLogger.Object);
+
+        _middleware = new TenantMiddleware(
+            next: (context) => Task.CompletedTask,
+            _mockLogger.Object,
+            _mockUserOrganizationCacheService.Object);
         _httpContext = new DefaultHttpContext();
     }
 
@@ -73,15 +80,15 @@ public class TenantMiddlewareTests : BaseUnitTest
         var userContext = new UserContext { UserId = user.Id, User = user };
         _httpContext.Items["UserContext"] = userContext;
 
-        _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None))
+        _mockUserOrganizationCacheService
+            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
+        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -100,15 +107,15 @@ public class TenantMiddlewareTests : BaseUnitTest
         var userContext = new UserContext { UserId = user.Id, User = user };
         _httpContext.Items["UserContext"] = userContext;
 
-        _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None))
+        _mockUserOrganizationCacheService
+            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
         await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
+        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -123,8 +130,8 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationUser.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
-        _mockUserRepository
-            .Setup(x => x.GetByIdWithOrganizationsAsync(userId, CancellationToken.None))
+        _mockUserOrganizationCacheService
+            .Setup(x => x.GetUserWithOrganizationsAsync(userId, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act & Assert

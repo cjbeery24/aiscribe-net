@@ -20,6 +20,7 @@ public class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordValidator _passwordValidator;
+    private readonly IUserCacheService _userCacheService;
 
     public AuthService(
         IUserRepository userRepository,
@@ -27,7 +28,8 @@ public class AuthService : IAuthService
         IJwtService jwtService,
         ILogger<AuthService> logger,
         IPasswordHasher passwordHasher,
-        IPasswordValidator passwordValidator)
+        IPasswordValidator passwordValidator,
+        IUserCacheService userCacheService)
     {
         _userRepository = userRepository;
         _userOrganizationRepository = userOrganizationRepository;
@@ -35,6 +37,7 @@ public class AuthService : IAuthService
         _logger = logger;
         _passwordHasher = passwordHasher;
         _passwordValidator = passwordValidator;
+        _userCacheService = userCacheService;
     }
 
     public async Task<ServiceResult<LoginResponse>> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
@@ -92,6 +95,9 @@ public class AuthService : IAuthService
             // Update user's last login
             user.LastLoginAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user, cancellationToken);
+
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(user.Id);
 
             _logger.LogInformation("Successful login for user {UserId}", user.Id);
 
@@ -353,6 +359,9 @@ public class AuthService : IAuthService
 
             await _userRepository.UpdateAsync(user, cancellationToken);
 
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(user.Id);
+
             // TODO: Send email with reset link
             _logger.LogInformation("Password reset token generated for user {UserId}: {Token}", user.Id, resetToken);
 
@@ -410,6 +419,9 @@ public class AuthService : IAuthService
             user.UpdatedAt = DateTime.UtcNow;
 
             await _userRepository.UpdateAsync(user, cancellationToken);
+
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(user.Id);
 
             _logger.LogInformation("Password reset successfully for user {UserId}", user.Id);
 

@@ -21,6 +21,8 @@ public class InvitationServiceTests
     private readonly Mock<ILogger<InvitationService>> _mockLogger;
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
     private readonly Mock<IPasswordValidator> _mockPasswordValidator;
+    private readonly Mock<IUserOrganizationCacheService> _mockUserOrganizationCacheService;
+    private readonly Mock<IUserCacheService> _mockUserCacheService;
     private readonly InvitationService _invitationService;
 
     public InvitationServiceTests()
@@ -33,6 +35,8 @@ public class InvitationServiceTests
         _mockLogger = new Mock<ILogger<InvitationService>>();
         _mockPasswordHasher = new Mock<IPasswordHasher>();
         _mockPasswordValidator = new Mock<IPasswordValidator>();
+        _mockUserOrganizationCacheService = new Mock<IUserOrganizationCacheService>();
+        _mockUserCacheService = new Mock<IUserCacheService>();
 
         _invitationService = new InvitationService(
             _mockUserRepository.Object,
@@ -42,7 +46,9 @@ public class InvitationServiceTests
             _mockJwtService.Object,
             _mockLogger.Object,
             _mockPasswordHasher.Object,
-            _mockPasswordValidator.Object);
+            _mockPasswordValidator.Object,
+            _mockUserOrganizationCacheService.Object,
+            _mockUserCacheService.Object);
     }
 
     #region InviteUserAsync Tests

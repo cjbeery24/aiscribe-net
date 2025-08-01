@@ -15,11 +15,13 @@ public class TenantMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<TenantMiddleware> _logger;
+    private readonly IUserOrganizationCacheService _userOrganizationCacheService;
 
-    public TenantMiddleware(RequestDelegate next, ILogger<TenantMiddleware> logger)
+    public TenantMiddleware(RequestDelegate next, ILogger<TenantMiddleware> logger, IUserOrganizationCacheService userOrganizationCacheService)
     {
         _next = next;
         _logger = logger;
+        _userOrganizationCacheService = userOrganizationCacheService;
     }
 
     public async Task InvokeAsync(HttpContext context, IUserRepository userRepository)
@@ -88,8 +90,12 @@ public class TenantMiddleware
             return null;
         }
 
-        // Get user with organization membership
-        var user = await userRepository.GetByIdWithOrganizationsAsync(userContext.UserId);
+        // Get user with organizations from cache or repository
+        var user = await _userOrganizationCacheService.GetUserWithOrganizationsAsync(
+            userContext.UserId,
+            userRepository.GetByIdWithOrganizationsAsync,
+            CancellationToken.None);
+
         if (user == null)
         {
             _logger.LogWarning("User not found: {UserId}", userContext.UserId);

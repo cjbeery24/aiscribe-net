@@ -21,6 +21,7 @@ public class AuthServiceTests : BaseUnitTest
     private readonly Mock<ILogger<AuthService>> _mockLogger;
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
     private readonly Mock<IPasswordValidator> _mockPasswordValidator;
+    private readonly Mock<IUserCacheService> _mockUserCacheService;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
@@ -31,6 +32,7 @@ public class AuthServiceTests : BaseUnitTest
         _mockLogger = new Mock<ILogger<AuthService>>();
         _mockPasswordHasher = new Mock<IPasswordHasher>();
         _mockPasswordValidator = new Mock<IPasswordValidator>();
+        _mockUserCacheService = new Mock<IUserCacheService>();
 
         _authService = new AuthService(
             _mockUserRepository.Object,
@@ -38,7 +40,8 @@ public class AuthServiceTests : BaseUnitTest
             _mockJwtService.Object,
             _mockLogger.Object,
             _mockPasswordHasher.Object,
-            _mockPasswordValidator.Object);
+            _mockPasswordValidator.Object,
+            _mockUserCacheService.Object);
     }
 
     [Fact]

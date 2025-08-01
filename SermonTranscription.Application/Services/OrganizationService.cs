@@ -20,6 +20,7 @@ public class OrganizationService : IOrganizationService
     private readonly ITranscriptionSessionRepository _transcriptionSessionRepository;
     private readonly ITranscriptionRepository _transcriptionRepository;
     private readonly ISubscriptionRepository _subscriptionRepository;
+    private readonly IUserOrganizationCacheService _userOrganizationCacheService;
     private readonly ILogger<OrganizationService> _logger;
 
     public OrganizationService(
@@ -29,6 +30,7 @@ public class OrganizationService : IOrganizationService
         ITranscriptionSessionRepository transcriptionSessionRepository,
         ITranscriptionRepository transcriptionRepository,
         ISubscriptionRepository subscriptionRepository,
+        IUserOrganizationCacheService userOrganizationCacheService,
         ILogger<OrganizationService> logger)
     {
         _organizationRepository = organizationRepository;
@@ -37,6 +39,7 @@ public class OrganizationService : IOrganizationService
         _transcriptionSessionRepository = transcriptionSessionRepository;
         _transcriptionRepository = transcriptionRepository;
         _subscriptionRepository = subscriptionRepository;
+        _userOrganizationCacheService = userOrganizationCacheService;
         _logger = logger;
     }
 
@@ -108,6 +111,9 @@ public class OrganizationService : IOrganizationService
 
             // Update the organization to save the user-organization relationship
             await _organizationRepository.UpdateAsync(organization, cancellationToken);
+
+            // Invalidate user cache since user now has a new organization membership
+            _userOrganizationCacheService.InvalidateUserCache(createdByUserId);
 
             _logger.LogInformation("Organization created: {OrganizationId} by user {UserId}", organization.Id, createdByUserId);
 

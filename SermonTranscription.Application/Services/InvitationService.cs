@@ -22,6 +22,8 @@ public class InvitationService
     private readonly ILogger<InvitationService> _logger;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordValidator _passwordValidator;
+    private readonly IUserOrganizationCacheService _userOrganizationCacheService;
+    private readonly IUserCacheService _userCacheService;
 
     public InvitationService(
         IUserRepository userRepository,
@@ -31,7 +33,9 @@ public class InvitationService
         IJwtService jwtService,
         ILogger<InvitationService> logger,
         IPasswordHasher passwordHasher,
-        IPasswordValidator passwordValidator)
+        IPasswordValidator passwordValidator,
+        IUserOrganizationCacheService userOrganizationCacheService,
+        IUserCacheService userCacheService)
     {
         _userRepository = userRepository;
         _userOrganizationRepository = userOrganizationRepository;
@@ -41,6 +45,8 @@ public class InvitationService
         _logger = logger;
         _passwordHasher = passwordHasher;
         _passwordValidator = passwordValidator;
+        _userOrganizationCacheService = userOrganizationCacheService;
+        _userCacheService = userCacheService;
     }
 
     /// <summary>
@@ -136,6 +142,9 @@ public class InvitationService
 
             await _userOrganizationRepository.AddAsync(userOrganization, cancellationToken);
 
+            // Invalidate user cache since user now has a new organization membership (pending)
+            _userOrganizationCacheService.InvalidateUserCache(user.Id);
+
             await _emailService.SendInvitationEmailAsync(user.Email, user.FirstName, organization.Name, invitingUser.FirstName, invitationToken);
 
             _logger.LogInformation("User {UserId} invited to organization {OrganizationId} by {InvitedByUserId}",
@@ -221,10 +230,16 @@ public class InvitationService
 
             await _userRepository.UpdateAsync(user, cancellationToken);
 
+            // Invalidate user cache
+            _userCacheService.InvalidateUserCache(user.Id);
+
             // Activate the membership
             userOrganization.AcceptInvitation();
 
             await _userOrganizationRepository.UpdateAsync(userOrganization, cancellationToken);
+
+            // Invalidate user cache since user's organization membership status changed
+            _userOrganizationCacheService.InvalidateUserCache(user.Id);
 
             await _emailService.SendWelcomeEmailAsync(user.Email, user.FirstName, userOrganization.Organization.Name);
 

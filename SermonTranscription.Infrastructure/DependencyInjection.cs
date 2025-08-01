@@ -55,6 +55,9 @@ public static class DependencyInjection
 
         // Service registrations
         services.AddScoped<IEmailService, EmailService>();
+
+        services.AddSingleton<IUserOrganizationCacheService, UserOrganizationCacheService>();
+        services.AddSingleton<IUserCacheService, UserCacheService>();
         // services.AddScoped<Infrastructure.Services.StripeService>();
 
         return services;

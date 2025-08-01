@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ITranscriptionSessionService, TranscriptionSessionService>();
+        services.AddScoped<IAudioStreamService, AudioStreamService>();
 
         services.AddScoped<InvitationService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();

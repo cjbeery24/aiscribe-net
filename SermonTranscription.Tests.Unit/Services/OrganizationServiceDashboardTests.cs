@@ -18,6 +18,7 @@ public class OrganizationServiceDashboardTests : BaseUnitTest
     private readonly Mock<ITranscriptionSessionRepository> _mockTranscriptionSessionRepository;
     private readonly Mock<ITranscriptionRepository> _mockTranscriptionRepository;
     private readonly Mock<ISubscriptionRepository> _mockSubscriptionRepository;
+    private readonly Mock<IUserOrganizationCacheService> _mockUserOrganizationCacheService;
     private readonly Mock<ILogger<OrganizationService>> _mockLogger;
     private readonly OrganizationService _organizationService;
 
@@ -29,6 +30,7 @@ public class OrganizationServiceDashboardTests : BaseUnitTest
         _mockTranscriptionSessionRepository = new Mock<ITranscriptionSessionRepository>();
         _mockTranscriptionRepository = new Mock<ITranscriptionRepository>();
         _mockSubscriptionRepository = new Mock<ISubscriptionRepository>();
+        _mockUserOrganizationCacheService = new Mock<IUserOrganizationCacheService>();
         _mockLogger = new Mock<ILogger<OrganizationService>>();
 
         _organizationService = new OrganizationService(
@@ -38,6 +40,7 @@ public class OrganizationServiceDashboardTests : BaseUnitTest
             _mockTranscriptionSessionRepository.Object,
             _mockTranscriptionRepository.Object,
             _mockSubscriptionRepository.Object,
+            _mockUserOrganizationCacheService.Object,
             _mockLogger.Object);
     }
 

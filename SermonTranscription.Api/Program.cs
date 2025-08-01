@@ -51,6 +51,9 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    // Memory Cache for audio stream sessions
+    builder.Services.AddMemoryCache();
+
     // Controllers and API Explorer
     builder.Services.AddControllers().AddJsonOptions(options =>
     {

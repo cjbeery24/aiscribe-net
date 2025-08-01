@@ -13,11 +13,13 @@ public class AuthenticationMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<AuthenticationMiddleware> _logger;
+    private readonly IUserCacheService _userCacheService;
 
-    public AuthenticationMiddleware(RequestDelegate next, ILogger<AuthenticationMiddleware> logger)
+    public AuthenticationMiddleware(RequestDelegate next, ILogger<AuthenticationMiddleware> logger, IUserCacheService userCacheService)
     {
         _next = next;
         _logger = logger;
+        _userCacheService = userCacheService;
     }
 
     public async Task InvokeAsync(HttpContext context, IUserRepository userRepository)
@@ -75,8 +77,12 @@ public class AuthenticationMiddleware
             return null;
         }
 
-        // Get user (without organization membership for organization-agnostic endpoints)
-        var user = await userRepository.GetByIdAsync(userId);
+        // Get user from cache or repository
+        var user = await _userCacheService.GetUserAsync(
+            userId,
+            userRepository.GetByIdAsync,
+            CancellationToken.None);
+
         if (user == null)
         {
             _logger.LogWarning("User not found: {UserId}", userId);
