@@ -11,12 +11,10 @@ public interface IUserOrganizationCacheService
     /// Get user with organizations from cache or load from repository
     /// </summary>
     /// <param name="userId">The user ID</param>
-    /// <param name="loadFromRepository">Function to load user data if not in cache</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The user with organizations, or null if not found</returns>
     Task<User?> GetUserWithOrganizationsAsync(
         Guid userId,
-        Func<Guid, CancellationToken, Task<User?>> loadFromRepository,
         CancellationToken cancellationToken = default);
 
     /// <summary>

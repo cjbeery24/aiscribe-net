@@ -15,16 +15,14 @@ public class TenantMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<TenantMiddleware> _logger;
-    private readonly IUserOrganizationCacheService _userOrganizationCacheService;
 
-    public TenantMiddleware(RequestDelegate next, ILogger<TenantMiddleware> logger, IUserOrganizationCacheService userOrganizationCacheService)
+    public TenantMiddleware(RequestDelegate next, ILogger<TenantMiddleware> logger)
     {
         _next = next;
         _logger = logger;
-        _userOrganizationCacheService = userOrganizationCacheService;
     }
 
-    public async Task InvokeAsync(HttpContext context, IUserRepository userRepository)
+    public async Task InvokeAsync(HttpContext context)
     {
         try
         {
@@ -43,7 +41,7 @@ public class TenantMiddleware
             }
 
             // Extract organization context from X-Organization-ID header
-            var tenantContext = await ResolveTenantContextAsync(context, userRepository, userContext);
+            var tenantContext = await ResolveTenantContextAsync(context, userContext);
 
             if (tenantContext != null)
             {
@@ -80,7 +78,7 @@ public class TenantMiddleware
         }
     }
 
-    private async Task<TenantContext?> ResolveTenantContextAsync(HttpContext context, IUserRepository userRepository, UserContext userContext)
+    private async Task<TenantContext?> ResolveTenantContextAsync(HttpContext context, UserContext userContext)
     {
         // Extract organization ID from X-Organization-ID header
         var organizationIdHeader = context.Request.Headers["X-Organization-ID"].FirstOrDefault();
@@ -90,10 +88,12 @@ public class TenantMiddleware
             return null;
         }
 
+        // Get scoped services from the request scope
+        var userOrganizationCacheService = context.RequestServices.GetRequiredService<IUserOrganizationCacheService>();
+
         // Get user with organizations from cache or repository
-        var user = await _userOrganizationCacheService.GetUserWithOrganizationsAsync(
+        var user = await userOrganizationCacheService.GetUserWithOrganizationsAsync(
             userContext.UserId,
-            userRepository.GetByIdWithOrganizationsAsync,
             CancellationToken.None);
 
         if (user == null)

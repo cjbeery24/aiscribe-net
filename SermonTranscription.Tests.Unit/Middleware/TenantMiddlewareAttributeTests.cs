@@ -7,9 +7,12 @@ using SermonTranscription.Api.Middleware;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Infrastructure.Data;
 using SermonTranscription.Tests.Unit.Common;
 using System.Security.Claims;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace SermonTranscription.Tests.Unit.Middleware;
 
@@ -29,9 +32,29 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
 
         _middleware = new TenantMiddleware(
             next: (context) => Task.CompletedTask,
-            _mockLogger.Object,
-            _mockUserOrganizationCacheService.Object);
+            _mockLogger.Object);
         _httpContext = new DefaultHttpContext();
+
+        // Set up the service provider to return our mocked services
+        SetupServiceProvider();
+    }
+
+    private void SetupServiceProvider()
+    {
+        // Create a new service collection with our mocked services
+        var services = new ServiceCollection();
+
+        // Add the base services
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()));
+
+        // Add our mocked services
+        services.AddSingleton(_mockUserOrganizationCacheService.Object);
+        services.AddSingleton(_mockUserRepository.Object);
+
+        // Replace the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        _httpContext.RequestServices = serviceProvider;
     }
 
     [Fact]
@@ -40,14 +63,14 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         // Arrange
         _httpContext.Request.Path = "/api/v1.0/auth/login";
         _httpContext.Request.Method = "POST";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
 
         // Create endpoint with PublicEndpoint attribute
         var endpoint = CreateEndpointWithAttribute<PublicEndpointAttribute>();
         _httpContext.SetEndpoint(endpoint);
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
@@ -63,7 +86,7 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
 
         _httpContext.Request.Path = "/api/v1.0/auth/organizations";
         _httpContext.Request.Method = "GET";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
         _httpContext.User = CreateClaimsPrincipal(userId);
 
         // Create endpoint with OrganizationAgnostic attribute
@@ -71,7 +94,7 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         _httpContext.SetEndpoint(endpoint);
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
@@ -86,7 +109,7 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
 
         _httpContext.Request.Path = "/api/v1.0/transcriptions";
         _httpContext.Request.Method = "GET";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
         _httpContext.User = CreateClaimsPrincipal(user.Id);
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
@@ -99,14 +122,14 @@ public class TenantMiddlewareAttributeTests : BaseUnitTest
         _httpContext.Items["UserContext"] = userContext;
 
         _mockUserOrganizationCacheService
-            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
+            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
-        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None), Times.Once);
+        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
     }
 
     private static Endpoint CreateEndpointWithAttribute<T>() where T : Attribute, new()

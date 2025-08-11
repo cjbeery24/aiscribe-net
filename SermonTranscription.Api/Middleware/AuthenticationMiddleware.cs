@@ -13,16 +13,14 @@ public class AuthenticationMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<AuthenticationMiddleware> _logger;
-    private readonly IUserCacheService _userCacheService;
 
-    public AuthenticationMiddleware(RequestDelegate next, ILogger<AuthenticationMiddleware> logger, IUserCacheService userCacheService)
+    public AuthenticationMiddleware(RequestDelegate next, ILogger<AuthenticationMiddleware> logger)
     {
         _next = next;
         _logger = logger;
-        _userCacheService = userCacheService;
     }
 
-    public async Task InvokeAsync(HttpContext context, IUserRepository userRepository)
+    public async Task InvokeAsync(HttpContext context)
     {
         try
         {
@@ -40,7 +38,7 @@ public class AuthenticationMiddleware
             }
 
             // Resolve user context for authenticated requests
-            var userContext = await ResolveUserContextAsync(context, userRepository);
+            var userContext = await ResolveUserContextAsync(context);
             if (userContext == null)
             {
                 // User validation failed
@@ -67,7 +65,7 @@ public class AuthenticationMiddleware
         }
     }
 
-    private async Task<UserContext?> ResolveUserContextAsync(HttpContext context, IUserRepository userRepository)
+    private async Task<UserContext?> ResolveUserContextAsync(HttpContext context)
     {
         // Extract user ID from claims
         var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier);
@@ -77,10 +75,12 @@ public class AuthenticationMiddleware
             return null;
         }
 
+        // Get scoped services from the request scope
+        var userCacheService = context.RequestServices.GetRequiredService<IUserCacheService>();
+
         // Get user from cache or repository
-        var user = await _userCacheService.GetUserAsync(
+        var user = await userCacheService.GetUserAsync(
             userId,
-            userRepository.GetByIdAsync,
             CancellationToken.None);
 
         if (user == null)

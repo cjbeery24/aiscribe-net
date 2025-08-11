@@ -12,13 +12,18 @@ public class UserOrganizationCacheService : IUserOrganizationCacheService
 {
     private readonly IMemoryCache _cache;
     private readonly ILogger<UserOrganizationCacheService> _logger;
+    private readonly IUserRepository _userRepository;
     private const string CacheKeyPrefix = "UserOrganizations_";
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(30);
 
-    public UserOrganizationCacheService(IMemoryCache cache, ILogger<UserOrganizationCacheService> logger)
+    public UserOrganizationCacheService(
+        IMemoryCache cache,
+        ILogger<UserOrganizationCacheService> logger,
+        IUserRepository userRepository)
     {
         _cache = cache;
         _logger = logger;
+        _userRepository = userRepository;
     }
 
     /// <summary>
@@ -26,7 +31,6 @@ public class UserOrganizationCacheService : IUserOrganizationCacheService
     /// </summary>
     public async Task<User?> GetUserWithOrganizationsAsync(
         Guid userId,
-        Func<Guid, CancellationToken, Task<User?>> loadFromRepository,
         CancellationToken cancellationToken = default)
     {
         var cacheKey = GetCacheKey(userId);
@@ -39,7 +43,7 @@ public class UserOrganizationCacheService : IUserOrganizationCacheService
         }
 
         // Cache miss - load from repository
-        user = await loadFromRepository(userId, cancellationToken);
+        user = await _userRepository.GetByIdWithOrganizationsAsync(userId, cancellationToken);
         if (user == null)
         {
             _logger.LogDebug("User not found in repository for user {UserId}", userId);

@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
+using SermonTranscription.Api.Authorization;
 using SermonTranscription.Api.Middleware;
 using SermonTranscription.Domain.Entities;
 using SermonTranscription.Domain.Enums;
 using SermonTranscription.Domain.Interfaces;
+using SermonTranscription.Infrastructure.Data;
 using SermonTranscription.Tests.Unit.Common;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Security.Claims;
 using Xunit;
 
@@ -28,9 +31,29 @@ public class TenantMiddlewareTests : BaseUnitTest
 
         _middleware = new TenantMiddleware(
             next: (context) => Task.CompletedTask,
-            _mockLogger.Object,
-            _mockUserOrganizationCacheService.Object);
+            _mockLogger.Object);
         _httpContext = new DefaultHttpContext();
+
+        // Set up the service provider to return our mocked services
+        SetupServiceProvider();
+    }
+
+    private void SetupServiceProvider()
+    {
+        // Create a new service collection with our mocked services
+        var services = new ServiceCollection();
+
+        // Add the base services
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()));
+
+        // Add our mocked services
+        services.AddSingleton(_mockUserOrganizationCacheService.Object);
+        services.AddSingleton(_mockUserRepository.Object);
+
+        // Replace the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        _httpContext.RequestServices = serviceProvider;
     }
 
     [Fact]
@@ -38,10 +61,10 @@ public class TenantMiddlewareTests : BaseUnitTest
     {
         // Arrange
         _httpContext.Request.Path = "/health";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
@@ -55,10 +78,10 @@ public class TenantMiddlewareTests : BaseUnitTest
     {
         // Arrange
         _httpContext.Request.Path = path;
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
         _mockUserRepository.Verify(x => x.GetByIdWithOrganizationsAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
@@ -72,7 +95,7 @@ public class TenantMiddlewareTests : BaseUnitTest
         var (user, membership) = TestDataFactory.CreateUserWithOrganization(organizationId, UserRole.OrganizationAdmin);
 
         _httpContext.Request.Path = "/api/transcriptions";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
         _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationAdmin.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
@@ -81,14 +104,14 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.Items["UserContext"] = userContext;
 
         _mockUserOrganizationCacheService
-            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
+            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
-        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None), Times.Once);
+        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -99,7 +122,7 @@ public class TenantMiddlewareTests : BaseUnitTest
         var (user, membership) = TestDataFactory.CreateUserWithOrganization(organizationId, UserRole.OrganizationUser);
 
         _httpContext.Request.Path = "/api/transcriptions";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
         _httpContext.User = CreateClaimsPrincipal(user.Id, organizationId, UserRole.OrganizationUser.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
@@ -108,14 +131,14 @@ public class TenantMiddlewareTests : BaseUnitTest
         _httpContext.Items["UserContext"] = userContext;
 
         _mockUserOrganizationCacheService
-            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
+            .Setup(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None))
             .ReturnsAsync(user);
 
         // Act
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
 
         // Assert
-        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None), Times.Once);
+        _mockUserOrganizationCacheService.Verify(x => x.GetUserWithOrganizationsAsync(user.Id, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -126,16 +149,16 @@ public class TenantMiddlewareTests : BaseUnitTest
         var organizationId = Guid.NewGuid();
 
         _httpContext.Request.Path = "/api/transcriptions";
-        _httpContext.RequestServices = ServiceProvider;
+        _httpContext.RequestServices = _httpContext.RequestServices;
         _httpContext.User = CreateClaimsPrincipal(userId, organizationId, UserRole.OrganizationUser.ToString());
         _httpContext.Request.Headers["X-Organization-ID"] = organizationId.ToString();
 
         _mockUserOrganizationCacheService
-            .Setup(x => x.GetUserWithOrganizationsAsync(userId, It.IsAny<Func<Guid, CancellationToken, Task<User?>>>(), CancellationToken.None))
+            .Setup(x => x.GetUserWithOrganizationsAsync(userId, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
         // Act & Assert
-        await _middleware.InvokeAsync(_httpContext, _mockUserRepository.Object);
+        await _middleware.InvokeAsync(_httpContext);
         // Should not throw exception
     }
 

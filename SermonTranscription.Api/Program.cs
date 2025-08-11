@@ -319,10 +319,6 @@ try
         var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
         if (publicAttribute != null) return false;
 
-        // Check for PublicEndpoint attribute on controller
-        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
-        if (controllerAttribute != null) return false;
-
         // Skip for health checks and swagger
         var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
         if (pathValue.StartsWith("/health") ||
@@ -345,10 +341,6 @@ try
         var publicAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
         if (publicAttribute != null) return false;
 
-        // Check for PublicEndpoint attribute on controller
-        var controllerAttribute = endpoint.Metadata.GetMetadata<PublicEndpointAttribute>();
-        if (controllerAttribute != null) return false;
-
         // Skip for health checks and swagger
         var pathValue = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
         if (pathValue.StartsWith("/health") ||
@@ -359,9 +351,6 @@ try
         // Skip tenant middleware for organization-agnostic endpoints
         var agnosticAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
         if (agnosticAttribute != null) return false;
-
-        var agnosticControllerAttribute = endpoint.Metadata.GetMetadata<OrganizationAgnosticAttribute>();
-        if (agnosticControllerAttribute != null) return false;
 
         // Apply tenant middleware to organization-specific routes only
         return true;
