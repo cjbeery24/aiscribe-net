@@ -77,7 +77,7 @@ public class AudioStreamController : BaseAuthenticatedApiController
             }
 
             // Send to SignalR hub for real-time processing
-            await _hubContext.Clients.Group($"session_{sessionId}").SendAsync("AudioChunkReceived", new
+            await _hubContext.Clients.Group($"session_{sessionId:guid}").SendAsync("AudioChunkReceived", new
             {
                 SessionId = sessionId,
                 ChunkIndex = chunkIndex,
@@ -290,7 +290,7 @@ public class AudioStreamController : BaseAuthenticatedApiController
         if (result.IsSuccess)
         {
             // Send to SignalR hub for real-time processing
-            await _hubContext.Clients.Group($"session_{sessionId}").SendAsync("AudioChunkReceived", new
+            await _hubContext.Clients.Group($"session_{sessionId:guid}").SendAsync("AudioChunkReceived", new
             {
                 SessionId = sessionId,
                 ChunkIndex = chunkIndex,
@@ -436,42 +436,4 @@ public class AudioStreamController : BaseAuthenticatedApiController
             return StatusCode(500, ApiErrorResponse.Create("Internal server error getting configuration"));
         }
     }
-}
-
-/// <summary>
-/// Audio chunk data for processing
-/// </summary>
-public class AudioChunkData
-{
-    public Guid SessionId { get; set; }
-    public int ChunkIndex { get; set; }
-    public byte[] AudioData { get; set; } = Array.Empty<byte>();
-    public bool IsFinalChunk { get; set; }
-    public DateTime Timestamp { get; set; }
-    public int SizeBytes { get; set; }
-}
-
-/// <summary>
-/// Audio control message for WebSocket communication
-/// </summary>
-public class AudioControlMessage
-{
-    public string Type { get; set; } = string.Empty;
-    public object? Data { get; set; }
-}
-
-/// <summary>
-/// Audio stream status response
-/// </summary>
-public class AudioStreamStatusResponse
-{
-    public Guid SessionId { get; set; }
-    public bool IsActive { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public bool CanReceiveAudio { get; set; }
-    public DateTime LastActivityAt { get; set; }
-    public bool SupportsWebSocket { get; set; }
-    public bool SupportsChunkedUpload { get; set; }
-    public int MaxChunkSizeBytes { get; set; }
-    public string[] SupportedAudioFormats { get; set; } = Array.Empty<string>();
 }

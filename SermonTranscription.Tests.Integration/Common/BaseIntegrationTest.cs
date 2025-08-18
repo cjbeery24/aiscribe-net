@@ -39,11 +39,22 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
     protected BaseIntegrationTest(TestWebApplicationFactory factory)
     {
         Factory = factory;
+        Factory.SetTestInstance(this);
+        // Create client after setting the test instance so ConfigureServices is called
         HttpClient = factory.CreateClient();
         DbContext = factory.Services.GetRequiredService<AppDbContext>();
         JwtService = factory.Services.GetRequiredService<IJwtService>();
         UserService = factory.Services.GetRequiredService<IUserService>();
         OrganizationService = factory.Services.GetRequiredService<IOrganizationService>();
+    }
+
+    /// <summary>
+    /// Override this method to configure services for derived test classes
+    /// </summary>
+    /// <param name="services">Service collection to configure</param>
+    protected virtual void ConfigureServices(IServiceCollection services)
+    {
+        // Base implementation does nothing - override in derived classes
     }
 
     public async Task InitializeAsync()
@@ -76,11 +87,17 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
     public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection; // Keep connection alive
+        private BaseIntegrationTest? _testInstance;
 
         public TestWebApplicationFactory()
         {
             _connection = new SqliteConnection("DataSource=:memory:;Cache=Shared");
             _connection.Open(); // Open connection explicitly
+        }
+
+        public void SetTestInstance(BaseIntegrationTest testInstance)
+        {
+            _testInstance = testInstance;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -120,6 +137,9 @@ public abstract class BaseIntegrationTest : IClassFixture<BaseIntegrationTest.Te
 
                 // Mock Redis to avoid external dependency
                 services.AddSingleton<IConnectionMultiplexer>(sp => Mock.Of<IConnectionMultiplexer>());
+
+                // Allow derived test classes to configure services
+                _testInstance?.ConfigureServices(services);
             });
 
             builder.UseEnvironment("Test");

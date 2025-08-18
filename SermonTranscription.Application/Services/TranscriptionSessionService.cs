@@ -86,12 +86,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             var response = await MapToResponseAsync(session, cancellationToken);
             return ServiceResult<TranscriptionSessionResponse>.Success(response);
@@ -110,12 +107,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             // Only allow updates if session is not in progress
             if (session.Status == SessionStatus.InProgress)
@@ -160,12 +154,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<bool>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<bool>.Failure("Access denied");
 
             // Only allow deletion if session is not in progress
             if (session.Status == SessionStatus.InProgress)
@@ -189,12 +180,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             session.Start();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -220,12 +208,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             session.Pause();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -251,12 +236,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             session.Resume();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -282,12 +264,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             session.Complete();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -313,12 +292,9 @@ public class TranscriptionSessionService : ITranscriptionSessionService
     {
         try
         {
-            var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken);
+            var session = await _sessionRepository.GetByIdAsync(sessionId, organizationId, cancellationToken);
             if (session == null)
                 return ServiceResult<TranscriptionSessionResponse>.Failure("Session not found");
-
-            if (session.OrganizationId != organizationId)
-                return ServiceResult<TranscriptionSessionResponse>.Failure("Access denied");
 
             session.Cancel();
             await _sessionRepository.UpdateAsync(session, cancellationToken);

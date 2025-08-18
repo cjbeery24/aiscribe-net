@@ -136,7 +136,7 @@ Based on: `prd-live-sermon-transcription-api.md`
 - [ ] 4.0 Transcription System & Real-Time Features
   - [x] 4.1 Set up SignalR hub for real-time communication with connection management
   - [x] 4.2 Create transcription session entity and management endpoints
-  - [ ] 4.3 Implement audio streaming endpoints for live session input
+  - [x] 4.3 Implement audio streaming endpoints for live session input
   - [ ] 4.4 Integrate with Gladia AI API for real-time transcription processing
   - [ ] 4.5 Build transcription CRUD operations with organization-scoped access
   - [ ] 4.6 Implement search functionality across transcriptions (keywords, phrases)

@@ -6,7 +6,7 @@ namespace SermonTranscription.Domain.Interfaces;
 /// <summary>
 /// Repository interface for TranscriptionSession entity with session-specific operations
 /// </summary>
-public interface ITranscriptionSessionRepository : IBaseRepository<TranscriptionSession>
+public interface ITranscriptionSessionRepository : IMultiTenantRepository<TranscriptionSession>
 {
     // Session-specific query methods
     Task<IEnumerable<TranscriptionSession>> GetByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);

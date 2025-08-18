@@ -222,3 +222,55 @@ public class AudioStreamConfiguration
     /// </summary>
     public int BufferSizeSeconds { get; set; } = 5;
 }
+
+/// <summary>
+/// Audio chunk data for processing
+/// </summary>
+public class AudioChunkData
+{
+    /// <summary>
+    /// The transcription session ID
+    /// </summary>
+    public Guid SessionId { get; set; }
+
+    /// <summary>
+    /// Sequential chunk index for ordering
+    /// </summary>
+    public int ChunkIndex { get; set; }
+
+    /// <summary>
+    /// Audio data bytes
+    /// </summary>
+    public byte[] AudioData { get; set; } = Array.Empty<byte>();
+
+    /// <summary>
+    /// Whether this is the final audio chunk
+    /// </summary>
+    public bool IsFinalChunk { get; set; }
+
+    /// <summary>
+    /// Timestamp when the chunk was captured
+    /// </summary>
+    public DateTime Timestamp { get; set; }
+
+    /// <summary>
+    /// Size of the chunk in bytes
+    /// </summary>
+    public int SizeBytes { get; set; }
+}
+
+/// <summary>
+/// Audio control message for WebSocket communication
+/// </summary>
+public class AudioControlMessage
+{
+    /// <summary>
+    /// Message type (EndStream, Ping, etc.)
+    /// </summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional message data
+    /// </summary>
+    public object? Data { get; set; }
+}

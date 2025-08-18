@@ -42,6 +42,7 @@ public class AudioStreamService : IAudioStreamService
         try
         {
             // Validate session exists and user has access
+            Console.WriteLine($"Starting audio stream for session {request.SessionId} by user {userId} for organization {organizationId}");
             var sessionResult = await _sessionService.GetSessionAsync(request.SessionId, organizationId, cancellationToken);
             if (!sessionResult.IsSuccess)
             {
